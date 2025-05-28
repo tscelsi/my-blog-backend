@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 
 from fragments.file import File
-from fragments.text import Text
+from fragments.text import RichText, Text
 
 
 class BaseMemoryError(Exception):
@@ -32,7 +32,7 @@ class Memory(BaseModel):
 
     title: str
     user_id: UUID
-    fragments: list[File | Text] = Field(default_factory=list)
+    fragments: list[File | Text | RichText] = Field(default_factory=list)
     id: UUID = Field(default_factory=uuid4)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(tz=timezone.utc)

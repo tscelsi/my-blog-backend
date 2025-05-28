@@ -5,7 +5,7 @@ from uuid import UUID
 from events.pubsub import LocalPublisher
 from fragments.base import FragmentType
 from fragments.file import File, FileFragmentFactory
-from fragments.text import Text
+from fragments.text import Op, RichText, Text
 from memory import Memory
 from memory_repository import AbstractMemoryRepository
 from utils.background_tasks import BackgroundTasks
@@ -53,23 +53,43 @@ async def create_memory_from_text(
     text: str,
     memory_repo: AbstractMemoryRepository,
 ) -> UUID:
-    """Create a Memory from a file.
+    """Create a Memory from text.
 
     Args:
         user_id (UUID): The ID of the user.
         memory_title (str): The title of the Memory.
-        filename (str): The name of the file.
-        file (BinaryIO): The file to save, opened in binary mode.
-        ifilesys (AbstractFileStorage): The file system interface.
+        text (str): The text content of the new fragment.
         memory_repo (AbstractMemoryRepository): Repository of Memories.
-        background_tasks (BackgroundTasks): Background task runner.
-        pub (LocalPublisher): Event publisher.
 
     Returns:
         UUID: The ID of the newly created Memory.
     """
     tf = Text.from_content(content=text)
     memory = Memory(title=memory_title, user_id=user_id, fragments=[tf])
+    await memory_repo.create(memory)  # commits
+    return memory.id
+
+
+async def create_memory_from_rich_text(
+    user_id: UUID,
+    memory_title: str,
+    content: list[Op],
+    memory_repo: AbstractMemoryRepository,
+) -> UUID:
+    """Create a Memory from a rich text representation.
+
+    Args:
+        user_id (UUID): The ID of the user.
+        memory_title (str): The title of the Memory.
+        content (list[Op]): The list of Delta operations making up the rich
+            text content.
+        memory_repo (AbstractMemoryRepository): Repository of Memories.
+
+    Returns:
+        UUID: The ID of the newly created Memory.
+    """
+    rtf = RichText.from_content(content=content)
+    memory = Memory(title=memory_title, user_id=user_id, fragments=[rtf])
     await memory_repo.create(memory)  # commits
     return memory.id
 
@@ -150,6 +170,28 @@ async def add_text_fragment_to_memory(
     return memory.id
 
 
+async def add_rich_text_fragment_to_memory(
+    memory_id: UUID,
+    content: list[Op],
+    memory_repo: AbstractMemoryRepository,
+) -> UUID:
+    """Add a rich text fragment to an existing Memory.
+
+    Args:
+        memory_id (UUID): The ID of the Memory to update.
+        content (list[Op]): The content of the rich text fragment.
+        memory_repo (AbstractMemoryRepository): Repository of Memories.
+
+    Returns:
+        UUID: The ID of the updated Memory.
+    """
+    rtf = RichText.from_content(content=content)
+    memory = await memory_repo.get(memory_id)
+    memory.fragments.append(rtf)
+    await memory_repo.update(memory)
+    return memory.id
+
+
 async def modify_text_fragment(
     memory_id: UUID,
     fragment_id: UUID,
@@ -169,9 +211,35 @@ async def modify_text_fragment(
     """
     memory = await memory_repo.get(memory_id)
     fragment = memory.get_fragment(fragment_id)
-    if isinstance(fragment, File):
+    if not isinstance(fragment, Text):
         raise TypeError(f"Fragment {fragment_id} is not a TextFragment.")
     fragment.content = text
+    await memory_repo.update(memory)
+    return memory.id
+
+
+async def modify_rich_text_fragment(
+    memory_id: UUID,
+    fragment_id: UUID,
+    content: list[Op],
+    memory_repo: AbstractMemoryRepository,
+) -> UUID:
+    """Modify an existing rich text fragment.
+
+    Args:
+        memory_id (UUID): The ID of the Memory to update.
+        fragment_id (UUID): The ID of the rich text fragment to modify.
+        text (str): The content of the updated rich text fragment.
+        memory_repo (AbstractMemoryRepository): Repository of Memories.
+
+    Returns:
+        UUID: The ID of the updated Memory.
+    """
+    memory = await memory_repo.get(memory_id)
+    fragment = memory.get_fragment(fragment_id)
+    if not isinstance(fragment, RichText):
+        raise TypeError(f"Fragment {fragment_id} is not a RichTextFragment.")
+    fragment.content = content
     await memory_repo.update(memory)
     return memory.id
 
@@ -378,28 +446,3 @@ async def forget_memory(
     await memory_repo.delete(memory)
     for key in file_keys:
         background_tasks.add(delete_file, key, ifilesys, pub)
-
-
-async def gen_file_url(
-    user_id: UUID,
-    memory_id: UUID,
-    fragment_id: UUID,
-    ifilesys: AbstractFileStorage,
-    memory_repo: AbstractMemoryRepository,
-):
-    """Generate a presigned URL for a file fragment.
-
-    Args:
-        user_id (UUID): The ID of the user.
-        memory_id (UUID): The ID of the memory containing the fragment.
-        fragment_id (UUID): The ID of the file fragment.
-        ifilesys (AbstractFileStorage): The file system interface.
-        memory_repo (AbstractMemoryRepository): Repository of Memories.
-
-    Returns:
-        str: The presigned URL for the file fragment.
-    """
-    memory = await memory_repo.get(memory_id)
-    fragment = memory.get_file_fragment(fragment_id)
-    key = fragment.gen_key(user_id)
-    return await ifilesys.generate_presigned_url(key)

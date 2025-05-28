@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -12,6 +13,7 @@ class FragmentType(Enum):
     IMAGE = "image"
     VIDEO = "video"
     TEXT = "text"
+    RICH_TEXT = "rich_text"
 
 
 class BaseFragment(BaseModel):
@@ -28,7 +30,7 @@ class BaseFragment(BaseModel):
             return False
         return self.id == other.id
 
-    def serialise(self) -> dict[str, str | int | None]:
+    def serialise(self) -> dict[str, Any]:
         """Serialise the fragment to a dictionary."""
         raise NotImplementedError(
             "Serialisation not implemented for the base fragment type. Must be implemented in subclasses."  # noqa
