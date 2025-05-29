@@ -5,11 +5,11 @@ I upload what I call a *Fragment*. Which is some form of media.
 The forms of media are:
 
 - Text
-  - Link
+- RichText
 - File
   - Audio
   - Image
-  - Video
+  - Video (TODO)
   - Other (PDF, etc.)
 
 
