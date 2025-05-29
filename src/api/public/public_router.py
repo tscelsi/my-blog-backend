@@ -1,3 +1,5 @@
+"""A public router for everyone to use. No auth needed."""
+
 from fastapi import APIRouter, Depends, Request
 
 from api.service_manager import ServiceManager
@@ -13,7 +15,8 @@ router = APIRouter(prefix="/public")
 def get_memory_repository_dep(request: Request) -> AbstractMemoryRepository:
     """Dependency to get the request-specific memory repository.
 
-    Uses the service manager's unauthorized supabase client."""
+    Uses the service manager's generic supabase client, that doesn't contain
+    a user-specific authorization header."""
     service_manager = ServiceManager.get(stub=False)
     repo = SupabaseMemoryRepository(service_manager.get_supabase_client())
     return repo

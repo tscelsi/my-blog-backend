@@ -84,6 +84,8 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
                 user_id=data["user_id"],
                 title=data["title"],
                 fragments=data["fragments"],
+                created_at=data["created_at"],
+                updated_at=data["updated_at"],
             )
         raise MemoryNotFoundError(f"Memory with id {id} not found")
 
@@ -115,6 +117,8 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
                     user_id=data["user_id"],
                     title=data["title"],
                     fragments=data["fragments"],
+                    created_at=data["created_at"],
+                    updated_at=data["updated_at"],
                 )
                 for data in res.data
             ]
