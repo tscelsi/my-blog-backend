@@ -109,7 +109,11 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
         await self.table.delete().eq("id", str(memory.id)).execute()
 
     async def list_all(self) -> list[Memory]:
-        res = await self.table.select("*").execute()
+        res = (
+            await self.table.select("*")
+            .order("created_at", desc=False)
+            .execute()
+        )
         if hasattr(res, "data") and res.data:
             return [
                 Memory(
