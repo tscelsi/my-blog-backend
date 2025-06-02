@@ -1,6 +1,10 @@
 """A public router for everyone to use. No auth needed."""
 
+from datetime import datetime
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel
 
 from api.service_manager import ServiceManager
 from memory import Memory
@@ -22,10 +26,28 @@ def get_memory_repository_dep(request: Request) -> AbstractMemoryRepository:
     return repo
 
 
-@router.get("/list-memories", response_model=list[Memory], status_code=200)
+class ListMemoryResponse(BaseModel):
+    id: UUID
+    title: str
+    created_at: datetime
+
+
+@router.get(
+    "/memory", response_model=list[ListMemoryResponse], status_code=200
+)
 async def list_memories(
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
 ):
     """List all my memories."""
     memories = await repo.list_all()
     return memories
+
+
+@router.get("/memory/{memory_id}", response_model=Memory, status_code=200)
+async def get_memory(
+    memory_id: UUID,
+    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+):
+    """Get a memory."""
+    memory = await repo.get(memory_id)
+    return memory
