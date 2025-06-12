@@ -25,7 +25,12 @@ class AbstractMemoryRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
-    async def list_all(self) -> list[Memory]:
+    async def public_list_all(self) -> list[Memory]:
+        """List all memories."""
+        pass
+
+    @abc.abstractmethod
+    async def authenticated_list_all(self) -> list[Memory]:
         """List all memories."""
         pass
 
@@ -70,8 +75,11 @@ class InMemoryMemoryRepository(AbstractMemoryRepository):
                 return memory
         raise MemoryNotFoundError(f"Memory with id {id} not found")
 
-    async def list_all(self) -> list[Memory]:
+    async def authenticated_list_all(self) -> list[Memory]:
         return self._memories
+
+    async def public_list_all(self) -> list[Memory]:
+        return [m for m in self._memories if not m.private]
 
     async def update(self, memory: Memory) -> None:
         # changed in-mem so all we do is check if mem exists.
@@ -84,7 +92,7 @@ class InMemoryMemoryRepository(AbstractMemoryRepository):
                 return
         raise MemoryNotFoundError(f"Memory with id {memory.id} not found")
 
-    async def update_draft_property(self, memory: Memory) -> None:
+    async def update_public_private(self, memory: Memory) -> None:
         pass
 
     async def update_pin_status(self, memory: Memory) -> None:
@@ -108,6 +116,9 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
                 user_id=data["user_id"],
                 title=data["title"],
                 fragments=data["fragments"],
+                private=data["private"],
+                pinned=data["pinned"],
+                tags=set(data["tags"]),
                 created_at=data["created_at"],
                 updated_at=data["updated_at"],
             )
@@ -132,12 +143,15 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
     async def delete(self, memory: Memory) -> None:
         await self.table.delete().eq("id", str(memory.id)).execute()
 
-    async def list_all(self) -> list[Memory]:
-        res = (
-            await self.table.select("*")
+    async def _list(self, authenticated: bool) -> list[Memory]:
+        q = (
+            self.table.select("*")
+            .order("pinned", desc=True)
             .order("created_at", desc=False)
-            .execute()
         )
+        if not authenticated:
+            q = q.eq("private", False)
+        res = await q.execute()
         if hasattr(res, "data") and res.data:
             return [
                 Memory(
@@ -145,12 +159,23 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
                     user_id=data["user_id"],
                     title=data["title"],
                     fragments=data["fragments"],
+                    private=data["private"],
+                    pinned=data["pinned"],
+                    tags=data["tags"],
                     created_at=data["created_at"],
                     updated_at=data["updated_at"],
                 )
                 for data in res.data
             ]
         return []
+
+    async def public_list_all(self) -> list[Memory]:
+        res = await self._list(authenticated=False)
+        return res
+
+    async def authenticated_list_all(self) -> list[Memory]:
+        res = await self._list(authenticated=True)
+        return res
 
     async def update(self, memory: Memory) -> None:
         await (

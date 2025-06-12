@@ -30,6 +30,8 @@ def get_memory_repository_dep(request: Request) -> AbstractMemoryRepository:
 class ListMemoryResponse(BaseModel):
     id: UUID
     title: str
+    pinned: bool
+    private: bool
     created_at: datetime
 
 
@@ -37,10 +39,14 @@ class ListMemoryResponse(BaseModel):
     "/memory", response_model=list[ListMemoryResponse], status_code=200
 )
 async def list_memories(
+    request: Request,
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
 ):
     """List all my memories."""
-    memories = await repo.list_all()
+    if request.user.is_authenticated:
+        memories = await repo.authenticated_list_all()
+    else:
+        memories = await repo.public_list_all()
     return memories
 
 
