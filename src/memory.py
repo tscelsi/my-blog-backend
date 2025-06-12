@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -9,6 +9,7 @@ from fragments.file import File
 from fragments.text import RichText, Text
 from tags import Tag
 from utils.logging_adapter import CustomLoggingAdapter
+from utils.mixins import AuditMixin
 
 
 class BaseMemoryError(Exception):
@@ -31,21 +32,14 @@ class MemoryAlreadyExistsError(BaseMemoryError):
     pass
 
 
-class Memory(BaseModel):
+class Memory(AuditMixin, BaseModel):
     """A memory. Made up of fragments."""
 
     title: str
     user_id: UUID
     fragments: list[File | Text | RichText] = Field(default_factory=lambda: [])
-    id: UUID = Field(default_factory=uuid4)
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(tz=timezone.utc)
-    )
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(tz=timezone.utc)
-    )
-    draft: bool = Field(
-        default=True, description="Whether this memory is a draft."
+    private: bool = Field(
+        default=True, description="Whether this memory is private."
     )
     pinned: bool = Field(
         default=False, description="Whether this memory is pinned."
@@ -128,14 +122,14 @@ class Memory(BaseModel):
         self.fragments = [self.get_fragment(f) for f in fragment_ids]
         self.updated_at = datetime.now(tz=timezone.utc)
 
-    def finalise(self):
-        """Finalise a memory."""
-        self.draft = False
+    def make_public(self):
+        """Make a memory public."""
+        self.private = False
         self.updated_at = datetime.now(tz=timezone.utc)
 
-    def mark_as_draft(self):
-        """Mark a memory as a draft."""
-        self.draft = True
+    def make_private(self):
+        """This memory is private and a secret :)"""
+        self.private = True
         self.updated_at = datetime.now(tz=timezone.utc)
 
     def pin(self):

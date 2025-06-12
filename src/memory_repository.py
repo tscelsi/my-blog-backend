@@ -34,8 +34,8 @@ class AbstractMemoryRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
-    async def update_draft_property(self, memory: Memory) -> None:
-        """Mark the memory as a draft or finalise it."""
+    async def update_public_private(self, memory: Memory) -> None:
+        """Mark the memory as a private or public."""
         pass
 
     @abc.abstractmethod
@@ -165,11 +165,11 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
             .execute()
         )
 
-    async def update_draft_property(self, memory: Memory) -> None:
+    async def update_public_private(self, memory: Memory) -> None:
         await (
             self.table.update(  # type: ignore
                 {
-                    "draft": memory.draft,
+                    "private": memory.private,
                     "updated_at": memory.updated_at.isoformat(),
                 }
             )

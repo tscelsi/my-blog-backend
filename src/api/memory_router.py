@@ -228,18 +228,18 @@ async def forget_memory(
         return HTTPException(status_code=500, detail="Error forgetting memory")
 
 
-@router.put("/{memory_id}/set-draft", status_code=204)
+@router.put("/{memory_id}/set-private", status_code=204)
 async def mark_memory_as_draft(
     memory_id: Annotated[UUID, Path()],
-    draft: Annotated[bool, Body(embed=True)],
+    private: Annotated[bool, Body(embed=True)],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
 ):
     """Mark a memory as a draft or finalised."""
     try:
-        if draft:
-            await services.mark_memory_as_draft(memory_id, repo)
+        if private:
+            await services.make_memory_private(memory_id, repo)
         else:
-            await services.finalise_memory(memory_id, repo)
+            await services.make_memory_public(memory_id, repo)
     except BaseMemoryError as e:
         logger.error(e)
         raise HTTPException(status_code=400, detail=str(e))
