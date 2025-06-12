@@ -1,19 +1,21 @@
 """A public router for everyone to use. No auth needed."""
 
+import logging
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from api.service_manager import ServiceManager
-from memory import Memory
+from memory import Memory, MemoryNotFoundError
 from memory_repository import (
     AbstractMemoryRepository,
     SupabaseMemoryRepository,
 )
 from tags import Tag
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/public")
 
 
@@ -53,10 +55,20 @@ async def list_memories(
 @router.get("/memory/{memory_id}", response_model=Memory, status_code=200)
 async def get_memory(
     memory_id: UUID,
+    request: Request,
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
 ):
     """Get a memory."""
-    memory = await repo.get(memory_id)
+    try:
+        if request.user.is_authenticated:
+            memory = await repo.authenticated_get(memory_id)
+        else:
+            memory = await repo.public_get(memory_id)
+    except MemoryNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail="Internal server error")
     return memory
 
 

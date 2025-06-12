@@ -16,7 +16,11 @@ class AbstractMemoryRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
-    async def get(self, id: UUID) -> Memory:
+    async def public_get(self, id: UUID) -> Memory:
+        pass
+
+    @abc.abstractmethod
+    async def authenticated_get(self, id: UUID) -> Memory:
         pass
 
     @abc.abstractmethod
@@ -69,9 +73,15 @@ class InMemoryMemoryRepository(AbstractMemoryRepository):
             )
         self._memories.append(memory)
 
-    async def get(self, id: UUID):
+    async def authenticated_get(self, id: UUID):
         for memory in self._memories:
             if memory.id == id:
+                return memory
+        raise MemoryNotFoundError(f"Memory with id {id} not found")
+
+    async def public_get(self, id: UUID) -> Memory:
+        for memory in self._memories:
+            if memory.id == id and memory.private is False:
                 return memory
         raise MemoryNotFoundError(f"Memory with id {id} not found")
 
@@ -83,7 +93,7 @@ class InMemoryMemoryRepository(AbstractMemoryRepository):
 
     async def update(self, memory: Memory) -> None:
         # changed in-mem so all we do is check if mem exists.
-        await self.get(memory.id)
+        await self.authenticated_get(memory.id)
 
     async def delete(self, memory: Memory) -> None:
         for i, m in enumerate(self._memories):
@@ -107,22 +117,13 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
         self.client = client
         self.table = self.client.table("memories")
 
-    async def get(self, id: UUID) -> Memory:
-        res = await self.table.select("*").eq("id", id).execute()
-        if hasattr(res, "data") and res.data:
-            data = res.data[0]
-            return Memory(
-                id=data["id"],
-                user_id=data["user_id"],
-                title=data["title"],
-                fragments=data["fragments"],
-                private=data["private"],
-                pinned=data["pinned"],
-                tags=set(data["tags"]),
-                created_at=data["created_at"],
-                updated_at=data["updated_at"],
-            )
-        raise MemoryNotFoundError(f"Memory with id {id} not found")
+    async def public_get(self, id: UUID) -> Memory:
+        res = await self._get(id, authenticated=False)
+        return res
+
+    async def authenticated_get(self, id: UUID) -> Memory:
+        res = await self._get(id, authenticated=True)
+        return res
 
     async def create(self, memory: Memory) -> None:
         try:
@@ -142,6 +143,26 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
 
     async def delete(self, memory: Memory) -> None:
         await self.table.delete().eq("id", str(memory.id)).execute()
+
+    async def _get(self, id: UUID, authenticated: bool) -> Memory:
+        q = self.table.select("*").eq("id", str(id))
+        if not authenticated:
+            q = q.eq("private", False)
+        res = await q.execute()
+        if hasattr(res, "data") and res.data:
+            data = res.data[0]
+            return Memory(
+                id=data["id"],
+                user_id=data["user_id"],
+                title=data["title"],
+                fragments=data["fragments"],
+                private=data["private"],
+                pinned=data["pinned"],
+                tags=set(data["tags"]),
+                created_at=data["created_at"],
+                updated_at=data["updated_at"],
+            )
+        raise MemoryNotFoundError(f"Memory with id {id} not found")
 
     async def _list(self, authenticated: bool) -> list[Memory]:
         q = (

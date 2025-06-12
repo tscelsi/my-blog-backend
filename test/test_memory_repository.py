@@ -30,14 +30,14 @@ class TestInMemoryRepository:
     async def test_get_memory(self, memory_repo: InMemoryMemoryRepository):
         memory = create_memory()
         await memory_repo.create(memory=memory)
-        retrieved_memory = await memory_repo.get(memory.id)
+        retrieved_memory = await memory_repo.authenticated_get(memory.id)
         assert memory.id == retrieved_memory.id
 
     async def test_get_memory_raises_when_not_exists(
         self, memory_repo: InMemoryMemoryRepository
     ):
         with pytest.raises(MemoryNotFoundError):
-            await memory_repo.get(uuid4())
+            await memory_repo.authenticated_get(uuid4())
 
 
 @pytest.fixture
@@ -58,14 +58,14 @@ class TestSupabaseRepository:
         repo = SupabaseMemoryRepository(supabase_client)
         memory = create_memory()
         await repo.create(memory)
-        res = await repo.get(memory.id)
+        res = await repo.authenticated_get(memory.id)
         assert res.id == memory.id
         assert len(res.fragments) == 1
         with pytest.raises(MemoryAlreadyExistsError):
             await repo.create(memory)
         memory.fragments = []
         await repo.update(memory)
-        res = await repo.get(memory.id)
+        res = await repo.authenticated_get(memory.id)
         assert len(res.fragments) == 0
         await repo.delete(memory)
 

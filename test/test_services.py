@@ -8,8 +8,8 @@ from memory_repository import InMemoryMemoryRepository
 from services import (
     create_memory_from_file,
     create_memory_from_text,
-    finalise_memory,
-    mark_memory_as_draft,
+    make_memory_private,
+    make_memory_public,
     pin_memory,
     save_file,
     unpin_memory,
@@ -64,7 +64,7 @@ async def test_save_file_as_memory(ifilesys: FakeStorage, pub: LocalPublisher):
         background_tasks,
         pub,
     )
-    memory = await repo.get(memory_id)
+    memory = await repo.authenticated_get(memory_id)
     file_fragment = memory.fragments[0]
     assert isinstance(file_fragment, File)
     assert file_fragment.status == FileFragmentStatus.UPLOADING
@@ -78,7 +78,7 @@ async def test_create_memory_from_text():
     memory_id = await create_memory_from_text(
         USER_ID, "test memory title", "test text", InMemoryMemoryRepository()
     )
-    memory = await repo.get(memory_id)
+    memory = await repo.authenticated_get(memory_id)
     text_fragment = memory.fragments[0]
     assert isinstance(text_fragment, Text)
     assert text_fragment.content == "test text"
@@ -89,15 +89,15 @@ async def test_finalise_memory():
     memory_id = await create_memory_from_text(
         USER_ID, "test memory title", "test text", InMemoryMemoryRepository()
     )
-    await finalise_memory(memory_id, repo)
-    memory = await repo.get(memory_id)
+    await make_memory_public(memory_id, repo)
+    memory = await repo.authenticated_get(memory_id)
     old_updated_at = memory.updated_at
-    assert memory.draft is False
+    assert memory.private is False
 
-    await mark_memory_as_draft(memory_id, repo)
-    memory = await repo.get(memory_id)
+    await make_memory_private(memory_id, repo)
+    memory = await repo.authenticated_get(memory_id)
     new_updated_at = memory.updated_at
-    assert memory.draft is True
+    assert memory.private is True
     assert new_updated_at > old_updated_at, (
         "Updated at should change when marking as draft"
     )
@@ -108,16 +108,16 @@ async def test_pin_memory():
     memory_id = await create_memory_from_text(
         USER_ID, "test memory title", "test text", InMemoryMemoryRepository()
     )
-    memory = await repo.get(memory_id)
+    memory = await repo.authenticated_get(memory_id)
     assert memory.pinned is False
 
     await pin_memory(memory_id, repo)
-    memory = await repo.get(memory_id)
+    memory = await repo.authenticated_get(memory_id)
     old_updated_at = memory.updated_at
     assert memory.pinned is True
 
     await unpin_memory(memory_id, repo)
-    memory = await repo.get(memory_id)
+    memory = await repo.authenticated_get(memory_id)
     new_updated_at = memory.updated_at
     assert memory.pinned is False
     assert new_updated_at > old_updated_at, (
@@ -133,5 +133,5 @@ async def test_set_tags():
     tags = {Tag.music, Tag.software}
     await update_tags(memory_id, tags, repo)
 
-    updated_memory = await repo.get(memory_id)
+    updated_memory = await repo.authenticated_get(memory_id)
     assert updated_memory.tags == tags
