@@ -33,6 +33,11 @@ class AbstractMemoryRepository(abc.ABC):
     async def update(self, memory: Memory) -> None:
         pass
 
+    @abc.abstractmethod
+    async def update_draft_property(self, memory: Memory) -> None:
+        """Mark the memory as a draft or finalise it."""
+        pass
+
 
 class InMemoryMemoryRepository(AbstractMemoryRepository):
     def __init__(self, memories: list[Memory] = []):
@@ -68,6 +73,9 @@ class InMemoryMemoryRepository(AbstractMemoryRepository):
                 del self._memories[i]
                 return
         raise MemoryNotFoundError(f"Memory with id {memory.id} not found")
+
+    async def update_draft_property(self, memory: Memory) -> None:
+        pass
 
 
 class SupabaseMemoryRepository(AbstractMemoryRepository):
@@ -135,6 +143,18 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
                     "fragments": [f.serialise() for f in memory.fragments],
                     "title": memory.title,
                     "updated_at": datetime.now(tz=timezone.utc).isoformat(),
+                }
+            )
+            .eq("id", str(memory.id))
+            .execute()
+        )
+
+    async def update_draft_property(self, memory: Memory) -> None:
+        await (
+            self.table.update(  # type: ignore
+                {
+                    "draft": memory.draft,
+                    "updated_at": memory.updated_at.isoformat(),
                 }
             )
             .eq("id", str(memory.id))

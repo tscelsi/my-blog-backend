@@ -446,3 +446,23 @@ async def forget_memory(
     await memory_repo.delete(memory)
     for key in file_keys:
         background_tasks.add(delete_file, key, ifilesys, pub)
+
+
+async def mark_memory_as_draft(
+    memory_id: UUID,
+    memory_repo: AbstractMemoryRepository,
+):
+    """Mark a memory as draft."""
+    memory = await memory_repo.get(memory_id)
+    memory.mark_as_draft()
+    await memory_repo.update_draft_property(memory)
+
+
+async def finalise_memory(
+    memory_id: UUID,
+    memory_repo: AbstractMemoryRepository,
+):
+    """Finalise a memory."""
+    memory = await memory_repo.get(memory_id)
+    memory.finalise()
+    await memory_repo.update_draft_property(memory)

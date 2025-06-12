@@ -32,13 +32,16 @@ class Memory(BaseModel):
 
     title: str
     user_id: UUID
-    fragments: list[File | Text | RichText] = Field(default_factory=list)
+    fragments: list[File | Text | RichText] = Field(default_factory=lambda: [])
     id: UUID = Field(default_factory=uuid4)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(tz=timezone.utc)
     )
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(tz=timezone.utc)
+    )
+    draft: bool = Field(
+        default=True, description="Whether this memory is a draft."
     )
 
     def __hash__(self):
@@ -101,7 +104,19 @@ class Memory(BaseModel):
         """Forget a fragment."""
         fragment = self.get_fragment(fragment_id)
         self.fragments.remove(fragment)
+        self.updated_at = datetime.now(tz=timezone.utc)
 
     def update_fragment_ordering(self, fragment_ids: list[UUID]):
         """Update the ordering of fragments in memory."""
         self.fragments = [self.get_fragment(f) for f in fragment_ids]
+        self.updated_at = datetime.now(tz=timezone.utc)
+
+    def finalise(self):
+        """Finalise a memory."""
+        self.draft = False
+        self.updated_at = datetime.now(tz=timezone.utc)
+
+    def mark_as_draft(self):
+        """Mark a memory as a draft."""
+        self.draft = True
+        self.updated_at = datetime.now(tz=timezone.utc)

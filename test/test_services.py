@@ -8,6 +8,8 @@ from memory_repository import InMemoryMemoryRepository
 from services import (
     create_memory_from_file,
     create_memory_from_text,
+    finalise_memory,
+    mark_memory_as_draft,
     save_file,
 )
 from utils.background_tasks import BackgroundTasks
@@ -76,3 +78,22 @@ async def test_create_memory_from_text():
     text_fragment = memory.fragments[0]
     assert isinstance(text_fragment, Text)
     assert text_fragment.content == "test text"
+
+
+async def test_finalise_memory():
+    repo = InMemoryMemoryRepository()
+    memory_id = await create_memory_from_text(
+        USER_ID, "test memory title", "test text", InMemoryMemoryRepository()
+    )
+    await finalise_memory(memory_id, repo)
+    memory = await repo.get(memory_id)
+    old_updated_at = memory.updated_at
+    assert memory.draft is False
+
+    await mark_memory_as_draft(memory_id, repo)
+    memory = await repo.get(memory_id)
+    new_updated_at = memory.updated_at
+    assert memory.draft is True
+    assert new_updated_at > old_updated_at, (
+        "Updated at should change when marking as draft"
+    )

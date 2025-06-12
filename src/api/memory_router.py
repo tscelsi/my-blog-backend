@@ -234,3 +234,39 @@ async def create_memory_from_rich_text(
             status_code=500,
             detail="An error occurred while creating the memory.",
         )
+
+
+@router.put("/mark-as-draft", status_code=204)
+async def mark_memory_as_draft(
+    memory_id: Annotated[UUID, Body()],
+    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+):
+    """Mark a memory as a draft."""
+    try:
+        await services.mark_memory_as_draft(memory_id, repo)
+    except BaseMemoryError as e:
+        logger.error(e)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error marking memory as draft: {e}")
+        logger.exception(e)
+        return HTTPException(
+            status_code=500, detail="Error marking memory as draft"
+        )
+
+
+@router.put("/finalise", status_code=204)
+async def finalise_memory(
+    memory_id: Annotated[UUID, Body()],
+    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+):
+    """Finalise a memory."""
+    try:
+        await services.finalise_memory(memory_id, repo)
+    except BaseMemoryError as e:
+        logger.error(e)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error finalising memory: {e}")
+        logger.exception(e)
+        return HTTPException(status_code=500, detail="Error finalising memory")
