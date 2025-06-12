@@ -38,6 +38,11 @@ class AbstractMemoryRepository(abc.ABC):
         """Mark the memory as a draft or finalise it."""
         pass
 
+    @abc.abstractmethod
+    async def update_pin_status(self, memory: Memory) -> None:
+        """Pin or unpin the memory."""
+        pass
+
 
 class InMemoryMemoryRepository(AbstractMemoryRepository):
     def __init__(self, memories: list[Memory] = []):
@@ -75,6 +80,9 @@ class InMemoryMemoryRepository(AbstractMemoryRepository):
         raise MemoryNotFoundError(f"Memory with id {memory.id} not found")
 
     async def update_draft_property(self, memory: Memory) -> None:
+        pass
+
+    async def update_pin_status(self, memory: Memory) -> None:
         pass
 
 
@@ -154,6 +162,18 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
             self.table.update(  # type: ignore
                 {
                     "draft": memory.draft,
+                    "updated_at": memory.updated_at.isoformat(),
+                }
+            )
+            .eq("id", str(memory.id))
+            .execute()
+        )
+
+    async def update_pin_status(self, memory: Memory) -> None:
+        await (
+            self.table.update(  # type: ignore
+                {
+                    "pinned": memory.pinned,
                     "updated_at": memory.updated_at.isoformat(),
                 }
             )

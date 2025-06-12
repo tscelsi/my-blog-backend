@@ -43,6 +43,9 @@ class Memory(BaseModel):
     draft: bool = Field(
         default=True, description="Whether this memory is a draft."
     )
+    pinned: bool = Field(
+        default=False, description="Whether this memory is pinned."
+    )
 
     def __hash__(self):
         return hash(self.id)
@@ -119,4 +122,14 @@ class Memory(BaseModel):
     def mark_as_draft(self):
         """Mark a memory as a draft."""
         self.draft = True
+        self.updated_at = datetime.now(tz=timezone.utc)
+
+    def pin(self):
+        """Pin a memory."""
+        self.pinned = True
+        self.updated_at = datetime.now(tz=timezone.utc)
+
+    def unpin(self):
+        """Unpin a memory."""
+        self.pinned = False
         self.updated_at = datetime.now(tz=timezone.utc)

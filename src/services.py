@@ -466,3 +466,23 @@ async def finalise_memory(
     memory = await memory_repo.get(memory_id)
     memory.finalise()
     await memory_repo.update_draft_property(memory)
+
+
+async def pin_memory(
+    memory_id: UUID,
+    memory_repo: AbstractMemoryRepository,
+):
+    """Pin a memory."""
+    memory = await memory_repo.get(memory_id)
+    memory.pin()
+    await memory_repo.update_pin_status(memory)
+
+
+async def unpin_memory(
+    memory_id: UUID,
+    memory_repo: AbstractMemoryRepository,
+):
+    """Unpin a memory."""
+    memory = await memory_repo.get(memory_id)
+    memory.unpin()
+    await memory_repo.update_pin_status(memory)

@@ -10,7 +10,9 @@ from services import (
     create_memory_from_text,
     finalise_memory,
     mark_memory_as_draft,
+    pin_memory,
     save_file,
+    unpin_memory,
 )
 from utils.background_tasks import BackgroundTasks
 from utils.file_storage.fake_storage import FakeStorage
@@ -96,4 +98,26 @@ async def test_finalise_memory():
     assert memory.draft is True
     assert new_updated_at > old_updated_at, (
         "Updated at should change when marking as draft"
+    )
+
+
+async def test_pin_memory():
+    repo = InMemoryMemoryRepository()
+    memory_id = await create_memory_from_text(
+        USER_ID, "test memory title", "test text", InMemoryMemoryRepository()
+    )
+    memory = await repo.get(memory_id)
+    assert memory.pinned is False
+
+    await pin_memory(memory_id, repo)
+    memory = await repo.get(memory_id)
+    old_updated_at = memory.updated_at
+    assert memory.pinned is True
+
+    await unpin_memory(memory_id, repo)
+    memory = await repo.get(memory_id)
+    new_updated_at = memory.updated_at
+    assert memory.pinned is False
+    assert new_updated_at > old_updated_at, (
+        "Updated at should change when pinning/unpinning"
     )

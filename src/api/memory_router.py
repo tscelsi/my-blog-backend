@@ -9,6 +9,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Path,
     Request,
     UploadFile,
 )
@@ -236,14 +237,20 @@ async def create_memory_from_rich_text(
         )
 
 
-@router.put("/mark-as-draft", status_code=204)
+
+
+@router.put("/{memory_id}/set-draft", status_code=204)
 async def mark_memory_as_draft(
-    memory_id: Annotated[UUID, Body()],
+    memory_id: Annotated[UUID, Path()],
+    draft: Annotated[bool, Body(embed=True)],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
 ):
-    """Mark a memory as a draft."""
+    """Mark a memory as a draft or finalised."""
     try:
-        await services.mark_memory_as_draft(memory_id, repo)
+        if draft:
+            await services.mark_memory_as_draft(memory_id, repo)
+        else:
+            await services.finalise_memory(memory_id, repo)
     except BaseMemoryError as e:
         logger.error(e)
         raise HTTPException(status_code=400, detail=str(e))
@@ -255,18 +262,22 @@ async def mark_memory_as_draft(
         )
 
 
-@router.put("/finalise", status_code=204)
-async def finalise_memory(
-    memory_id: Annotated[UUID, Body()],
+@router.put("/{memory_id}/set-pin", status_code=204)
+async def pin_memory(
+    memory_id: Annotated[UUID, Path()],
+    pin: Annotated[bool, Body(embed=True)],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
 ):
-    """Finalise a memory."""
+    """Pin or unpin a memory."""
     try:
-        await services.finalise_memory(memory_id, repo)
+        if pin:
+            await services.pin_memory(memory_id, repo)
+        else:
+            await services.unpin_memory(memory_id, repo)
     except BaseMemoryError as e:
         logger.error(e)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Error finalising memory: {e}")
+        logger.error(f"Error pinning memory: {e}")
         logger.exception(e)
-        return HTTPException(status_code=500, detail="Error finalising memory")
+        return HTTPException(status_code=500, detail="Error pinning memory")
