@@ -234,7 +234,7 @@ async def mark_memory_as_draft(
     private: Annotated[bool, Body(embed=True)],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
 ):
-    """Mark a memory as a draft or finalised."""
+    """Mark a memory as a private or public."""
     try:
         if private:
             await services.make_memory_private(memory_id, repo)
