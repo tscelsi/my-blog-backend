@@ -12,6 +12,7 @@ from memory_repository import (
     AbstractMemoryRepository,
     SupabaseMemoryRepository,
 )
+from tags import Tag
 
 router = APIRouter(prefix="/public")
 
@@ -51,3 +52,9 @@ async def get_memory(
     """Get a memory."""
     memory = await repo.get(memory_id)
     return memory
+
+
+@router.get("/tags", response_model=list[Tag], status_code=200)
+async def list_tags():
+    """List all available tags."""
+    return [t for t in Tag.__members__.values()]

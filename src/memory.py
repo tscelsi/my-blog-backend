@@ -1,10 +1,14 @@
+import logging
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
 from fragments.file import File
 from fragments.text import RichText, Text
+from tags import Tag
+from utils.logging_adapter import CustomLoggingAdapter
 
 
 class BaseMemoryError(Exception):
@@ -46,6 +50,16 @@ class Memory(BaseModel):
     pinned: bool = Field(
         default=False, description="Whether this memory is pinned."
     )
+    tags: set[Tag] = Field(
+        default_factory=lambda: set(), description="Tags for this memory."
+    )
+
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
+        self._logger = CustomLoggingAdapter(
+            logging.getLogger(__name__),
+            {"ctx": f"memory:{self.id}"},
+        )
 
     def __hash__(self):
         return hash(self.id)
@@ -132,4 +146,9 @@ class Memory(BaseModel):
     def unpin(self):
         """Unpin a memory."""
         self.pinned = False
+        self.updated_at = datetime.now(tz=timezone.utc)
+
+    def set_tags(self, tags: set[Tag]):
+        """Set new tags on the memory."""
+        self.tags = tags
         self.updated_at = datetime.now(tz=timezone.utc)

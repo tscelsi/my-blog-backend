@@ -8,6 +8,7 @@ from fragments.file import File, FileFragmentFactory
 from fragments.text import Op, RichText, Text
 from memory import Memory
 from memory_repository import AbstractMemoryRepository
+from tags import Tag
 from utils.background_tasks import BackgroundTasks
 from utils.file_storage.base_storage import AbstractFileStorage
 
@@ -486,3 +487,14 @@ async def unpin_memory(
     memory = await memory_repo.get(memory_id)
     memory.unpin()
     await memory_repo.update_pin_status(memory)
+
+
+async def update_tags(
+    memory_id: UUID,
+    tags: set[Tag],
+    memory_repo: AbstractMemoryRepository,
+):
+    """Update the tags associated with a memory."""
+    memory = await memory_repo.get(memory_id)
+    memory.set_tags(tags)
+    await memory_repo.update_tags(memory)

@@ -13,7 +13,9 @@ from services import (
     pin_memory,
     save_file,
     unpin_memory,
+    update_tags,
 )
+from tags import Tag
 from utils.background_tasks import BackgroundTasks
 from utils.file_storage.fake_storage import FakeStorage
 
@@ -121,3 +123,15 @@ async def test_pin_memory():
     assert new_updated_at > old_updated_at, (
         "Updated at should change when pinning/unpinning"
     )
+
+
+async def test_set_tags():
+    repo = InMemoryMemoryRepository()
+    memory_id = await create_memory_from_text(
+        USER_ID, "test memory title", "test text", InMemoryMemoryRepository()
+    )
+    tags = {Tag.music, Tag.software}
+    await update_tags(memory_id, tags, repo)
+
+    updated_memory = await repo.get(memory_id)
+    assert updated_memory.tags == tags
