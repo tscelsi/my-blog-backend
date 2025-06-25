@@ -157,27 +157,6 @@ async def merge_memories(
         return HTTPException(status_code=500, detail="Error merging memories")
 
 
-@router.post("/{memory_id}/update", response_model=None, status_code=204)
-async def update_memory_endpoint(
-    memory_id: Annotated[UUID, Path()],
-    memory_title: Annotated[str, Body()],
-    fragment_ids: Annotated[list[UUID], Body()],
-    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-):
-    """Update the title and ordering of fragments in a Memory."""
-    try:
-        await services.update_memory_title_and_ordering(
-            memory_id, memory_title, fragment_ids, repo
-        )
-    except BaseMemoryError as e:
-        logger.error(e)
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error merging memories: {e}")
-        logger.exception(e)
-        return HTTPException(status_code=500, detail="Error merging memories")
-
-
 @router.post("/{memory_id}/split", response_model=None, status_code=204)
 async def split_memory(
     memory_id: Annotated[UUID, Path()],
@@ -291,3 +270,45 @@ async def tag_memory(
         logger.error(f"Error tagging memory: {e}")
         logger.exception(e)
         return HTTPException(status_code=500, detail="Error tagging memory")
+
+
+@router.put("/{memory_id}/set-fragment-order", status_code=204)
+async def set_fragment_ordering(
+    memory_id: Annotated[UUID, Path()],
+    fragment_ids: Annotated[list[UUID], Body(embed=True)],
+    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+):
+    """Update ordering of fragments in a Memory."""
+    try:
+        await services.update_memory_fragment_ordering(
+            memory_id, fragment_ids, repo
+        )
+    except BaseMemoryError as e:
+        logger.error(e)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error re-ordering fragments: {e}")
+        logger.exception(e)
+        return HTTPException(
+            status_code=500, detail="Error re-ordering fragments"
+        )
+
+
+@router.put("/{memory_id}/set-memory-title", status_code=204)
+async def set_memory_title(
+    memory_id: Annotated[UUID, Path()],
+    memory_title: Annotated[str, Body(embed=True)],
+    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+):
+    """Change a memories title."""
+    try:
+        await services.update_memory_title(memory_id, memory_title, repo)
+    except BaseMemoryError as e:
+        logger.error(e)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error changing memory title: {e}")
+        logger.exception(e)
+        return HTTPException(
+            status_code=500, detail="Error changing memory title"
+        )

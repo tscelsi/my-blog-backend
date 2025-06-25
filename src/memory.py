@@ -71,18 +71,6 @@ class Memory(AuditMixin, BaseModel):
             f"Fragment with ID {fragment_id} doesn't exist in memory {self.id}"
         )
 
-    def get_file_fragment(self, fragment_id: UUID):
-        for fragment in self.fragments:
-            if fragment_id == fragment.id:
-                if isinstance(fragment, File):
-                    return fragment
-                raise TypeError(
-                    f"Fragment with ID {fragment_id} is not a FileFragment"
-                )
-        raise ValueError(
-            f"Fragment with ID {fragment_id} doesn't exist in memory {self.id}"
-        )
-
     def list_fragments(self, fragment_ids: list[UUID]):
         """List fragments in memory."""
         return [f for f in self.fragments if f.id in fragment_ids]

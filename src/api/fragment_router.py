@@ -12,6 +12,7 @@ from fastapi import (
     Request,
     UploadFile,
 )
+from pydantic import BaseModel
 
 import services
 from api.middleware.auth import require_auth_dep
@@ -36,17 +37,21 @@ def get_memory_repository_dep(request: Request) -> AbstractMemoryRepository:
     return repo
 
 
-@router.post("/add-file", status_code=201, response_model=None)
+class AddFragmentResponse(BaseModel):
+    fragment_id: UUID
+
+
+@router.post("/add-file", status_code=201, response_model=AddFragmentResponse)
 async def add_file_fragment_to_memory_endpoint(
     file: Annotated[UploadFile, File()],
     memory_id: Annotated[UUID, Form()],
     type: Annotated[FragmentType, Form()],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-) -> None:
+) -> AddFragmentResponse:
     """Add a file Fragment to a Memory."""
     service_manager = ServiceManager.get()
     try:
-        await services.add_file_fragment_to_memory(
+        fragment_id = await services.add_file_fragment_to_memory(
             memory_id,
             type,
             file.filename or "_blank",
@@ -56,6 +61,7 @@ async def add_file_fragment_to_memory_endpoint(
             service_manager.background_tasks,
             service_manager.pub,
         )
+        return AddFragmentResponse(fragment_id=fragment_id)
     except Exception as e:
         logger.exception(e)
         raise HTTPException(
@@ -64,17 +70,20 @@ async def add_file_fragment_to_memory_endpoint(
         )
 
 
-@router.post("/add-rich-text", status_code=201, response_model=None)
+@router.post(
+    "/add-rich-text", status_code=201, response_model=AddFragmentResponse
+)
 async def add_rich_text_fragment_to_memory_endpoint(
     content: Annotated[list[Op], Body()],
     memory_id: Annotated[UUID, Body()],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-) -> None:
+) -> AddFragmentResponse:
     """Add a rich text Fragment to a Memory."""
     try:
-        await services.add_rich_text_fragment_to_memory(
+        fragment_id = await services.add_rich_text_fragment_to_memory(
             memory_id, content, repo
         )
+        return AddFragmentResponse(fragment_id=fragment_id)
     except Exception as e:
         logger.exception(e)
         raise HTTPException(
@@ -83,18 +92,21 @@ async def add_rich_text_fragment_to_memory_endpoint(
         )
 
 
-@router.post("/modify-rich-text", status_code=201, response_model=None)
+@router.post(
+    "/modify-rich-text", status_code=201, response_model=AddFragmentResponse
+)
 async def modify_rich_text_fragment_endpoint(
     content: Annotated[list[Op], Body()],
     memory_id: Annotated[UUID, Body()],
     fragment_id: Annotated[UUID, Body()],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-) -> None:
+) -> AddFragmentResponse:
     """Modify an existing rich text Fragment."""
     try:
-        await services.modify_rich_text_fragment(
+        fragment_id = await services.modify_rich_text_fragment(
             memory_id, fragment_id, content, repo
         )
+        return AddFragmentResponse(fragment_id=fragment_id)
     except Exception as e:
         logger.exception(e)
         raise HTTPException(

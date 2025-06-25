@@ -92,22 +92,37 @@ async def create_memory_from_rich_text(
     return memory.id
 
 
-async def update_memory_title_and_ordering(
+async def update_memory_title(
     memory_id: UUID,
     title: str,
-    fragment_ids: list[UUID],
     memory_repo: AbstractMemoryRepository,
 ):
-    """Update the title and ordering of fragments in a Memory.
+    """Update the title of a Memory.
 
     Args:
         memory_id (UUID): The ID of the Memory to update.
         title (str): The new title for the Memory.
-        fragment_ids (list[UUID]): The IDs of the fragments in the new order.
         memory_repo (AbstractMemoryRepository): Repository of Memories.
     """
     memory = await memory_repo.authenticated_get(memory_id)
     memory.title = title
+    await memory_repo.update(memory)
+    return memory.id
+
+
+async def update_memory_fragment_ordering(
+    memory_id: UUID,
+    fragment_ids: list[UUID],
+    memory_repo: AbstractMemoryRepository,
+):
+    """Update the ordering of fragments in a Memory.
+
+    Args:
+        memory_id (UUID): The ID of the Memory to update.
+        fragment_ids (list[UUID]): The IDs of the fragments in the new order.
+        memory_repo (AbstractMemoryRepository): Repository of Memories.
+    """
+    memory = await memory_repo.authenticated_get(memory_id)
     memory.update_fragment_ordering(fragment_ids)
     await memory_repo.update(memory)
     return memory.id
@@ -143,7 +158,7 @@ async def add_file_fragment_to_memory(
     memory.fragments.append(ff)
     await memory_repo.update(memory)
     background_tasks.add(save_file, ff, memory, file.read(), ifilesys, pub)
-    return memory.id
+    return ff.id
 
 
 async def add_rich_text_fragment_to_memory(
@@ -165,7 +180,7 @@ async def add_rich_text_fragment_to_memory(
     memory = await memory_repo.authenticated_get(memory_id)
     memory.fragments.append(rtf)
     await memory_repo.update(memory)
-    return memory.id
+    return rtf.id
 
 
 async def modify_rich_text_fragment(
@@ -191,7 +206,7 @@ async def modify_rich_text_fragment(
         raise TypeError(f"Fragment {fragment_id} is not a RichTextFragment.")
     fragment.content = content
     await memory_repo.update(memory)
-    return memory.id
+    return fragment.id
 
 
 async def save_file(
