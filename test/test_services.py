@@ -3,11 +3,10 @@ import io
 from events.pubsub import LocalPublisher
 from fragments.base import FragmentType
 from fragments.file import File, FileFragmentStatus
-from fragments.text import Text
 from memory_repository import InMemoryMemoryRepository
 from services import (
     create_memory_from_file,
-    create_memory_from_text,
+    create_memory_from_rich_text,
     make_memory_private,
     make_memory_public,
     pin_memory,
@@ -73,21 +72,10 @@ async def test_save_file_as_memory(ifilesys: FakeStorage, pub: LocalPublisher):
     assert pub._latest_event["topic"] == "filesys_save_success"  # type: ignore  # noqa
 
 
-async def test_create_memory_from_text():
-    repo = InMemoryMemoryRepository()
-    memory_id = await create_memory_from_text(
-        USER_ID, "test memory title", "test text", InMemoryMemoryRepository()
-    )
-    memory = await repo.authenticated_get(memory_id)
-    text_fragment = memory.fragments[0]
-    assert isinstance(text_fragment, Text)
-    assert text_fragment.content == "test text"
-
-
 async def test_finalise_memory():
     repo = InMemoryMemoryRepository()
-    memory_id = await create_memory_from_text(
-        USER_ID, "test memory title", "test text", InMemoryMemoryRepository()
+    memory_id = await create_memory_from_rich_text(
+        USER_ID, "test memory title", [], InMemoryMemoryRepository()
     )
     await make_memory_public(memory_id, repo)
     memory = await repo.authenticated_get(memory_id)
@@ -105,8 +93,8 @@ async def test_finalise_memory():
 
 async def test_pin_memory():
     repo = InMemoryMemoryRepository()
-    memory_id = await create_memory_from_text(
-        USER_ID, "test memory title", "test text", InMemoryMemoryRepository()
+    memory_id = await create_memory_from_rich_text(
+        USER_ID, "test memory title", [], InMemoryMemoryRepository()
     )
     memory = await repo.authenticated_get(memory_id)
     assert memory.pinned is False
@@ -127,8 +115,8 @@ async def test_pin_memory():
 
 async def test_set_tags():
     repo = InMemoryMemoryRepository()
-    memory_id = await create_memory_from_text(
-        USER_ID, "test memory title", "test text", InMemoryMemoryRepository()
+    memory_id = await create_memory_from_rich_text(
+        USER_ID, "test memory title", [], InMemoryMemoryRepository()
     )
     tags = {Tag.music, Tag.software}
     await update_tags(memory_id, tags, repo)

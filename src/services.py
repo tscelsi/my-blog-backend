@@ -5,7 +5,7 @@ from uuid import UUID
 from events.pubsub import LocalPublisher
 from fragments.base import FragmentType
 from fragments.file import File, FileFragmentFactory
-from fragments.text import Op, RichText, Text
+from fragments.text import Op, RichText
 from memory import Memory
 from memory_repository import AbstractMemoryRepository
 from tags import Tag
@@ -13,6 +13,26 @@ from utils.background_tasks import BackgroundTasks
 from utils.file_storage.base_storage import AbstractFileStorage
 
 logger = logging.getLogger(__name__)
+
+
+async def create_empty_memory(
+    user_id: UUID,
+    memory_title: str,
+    memory_repo: AbstractMemoryRepository,
+) -> UUID:
+    """Create an empty Memory.
+
+    Args:
+        user_id (UUID): The ID of the user.
+        memory_title (str): The title of the Memory.
+        memory_repo (AbstractMemoryRepository): Repository of Memories.
+
+    Returns:
+        UUID: The ID of the newly created Memory.
+    """
+    memory = Memory(title=memory_title, user_id=user_id)
+    await memory_repo.create(memory)  # commits
+    return memory.id
 
 
 async def create_memory_from_file(
@@ -45,29 +65,6 @@ async def create_memory_from_file(
     memory = Memory(title=memory_title, user_id=user_id, fragments=[ff])
     await memory_repo.create(memory)  # commits
     background_tasks.add(save_file, ff, memory, file.read(), ifilesys, pub)
-    return memory.id
-
-
-async def create_memory_from_text(
-    user_id: UUID,
-    memory_title: str,
-    text: str,
-    memory_repo: AbstractMemoryRepository,
-) -> UUID:
-    """Create a Memory from text.
-
-    Args:
-        user_id (UUID): The ID of the user.
-        memory_title (str): The title of the Memory.
-        text (str): The text content of the new fragment.
-        memory_repo (AbstractMemoryRepository): Repository of Memories.
-
-    Returns:
-        UUID: The ID of the newly created Memory.
-    """
-    tf = Text.from_content(content=text)
-    memory = Memory(title=memory_title, user_id=user_id, fragments=[tf])
-    await memory_repo.create(memory)  # commits
     return memory.id
 
 
@@ -149,28 +146,6 @@ async def add_file_fragment_to_memory(
     return memory.id
 
 
-async def add_text_fragment_to_memory(
-    memory_id: UUID,
-    text: str,
-    memory_repo: AbstractMemoryRepository,
-) -> UUID:
-    """Add a text fragment to an existing Memory.
-
-    Args:
-        memory_id (UUID): The ID of the Memory to update.
-        text (str): The content of the text fragment.
-        memory_repo (AbstractMemoryRepository): Repository of Memories.
-
-    Returns:
-        UUID: The ID of the updated Memory.
-    """
-    tf = Text.from_content(content=text)
-    memory = await memory_repo.authenticated_get(memory_id)
-    memory.fragments.append(tf)
-    await memory_repo.update(memory)
-    return memory.id
-
-
 async def add_rich_text_fragment_to_memory(
     memory_id: UUID,
     content: list[Op],
@@ -189,32 +164,6 @@ async def add_rich_text_fragment_to_memory(
     rtf = RichText.from_content(content=content)
     memory = await memory_repo.authenticated_get(memory_id)
     memory.fragments.append(rtf)
-    await memory_repo.update(memory)
-    return memory.id
-
-
-async def modify_text_fragment(
-    memory_id: UUID,
-    fragment_id: UUID,
-    text: str,
-    memory_repo: AbstractMemoryRepository,
-) -> UUID:
-    """Modify an existing text fragment.
-
-    Args:
-        memory_id (UUID): The ID of the Memory to update.
-        fragment_id (UUID): The ID of the text fragment to modify.
-        text (str): The content of the text fragment.
-        memory_repo (AbstractMemoryRepository): Repository of Memories.
-
-    Returns:
-        UUID: The ID of the updated Memory.
-    """
-    memory = await memory_repo.authenticated_get(memory_id)
-    fragment = memory.get_fragment(fragment_id)
-    if not isinstance(fragment, Text):
-        raise TypeError(f"Fragment {fragment_id} is not a TextFragment.")
-    fragment.content = text
     await memory_repo.update(memory)
     return memory.id
 

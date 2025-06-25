@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from fragments.file import File
-from fragments.text import RichText, Text
+from fragments.text import RichText
 from tags import Tag
 from utils.logging_adapter import CustomLoggingAdapter
 from utils.mixins import AuditMixin
@@ -37,7 +37,7 @@ class Memory(AuditMixin, BaseModel):
 
     title: str
     user_id: UUID
-    fragments: list[File | Text | RichText] = Field(default_factory=lambda: [])
+    fragments: list[File | RichText] = Field(default_factory=lambda: [])
     private: bool = Field(
         default=True, description="Whether this memory is private."
     )

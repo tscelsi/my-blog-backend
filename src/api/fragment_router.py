@@ -64,23 +64,6 @@ async def add_file_fragment_to_memory_endpoint(
         )
 
 
-@router.post("/add-text", status_code=201, response_model=None)
-async def add_text_fragment_to_memory_endpoint(
-    text: Annotated[str, Body()],
-    memory_id: Annotated[UUID, Body()],
-    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-) -> None:
-    """Add a text Fragment to a Memory."""
-    try:
-        await services.add_text_fragment_to_memory(memory_id, text, repo)
-    except Exception as e:
-        logger.exception(e)
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while adding a fragment to a memory.",
-        )
-
-
 @router.post("/add-rich-text", status_code=201, response_model=None)
 async def add_rich_text_fragment_to_memory_endpoint(
     content: Annotated[list[Op], Body()],
@@ -97,24 +80,6 @@ async def add_rich_text_fragment_to_memory_endpoint(
         raise HTTPException(
             status_code=500,
             detail="An error occurred while adding a fragment to a memory.",
-        )
-
-
-@router.post("/modify-text", status_code=201, response_model=None)
-async def modify_text_fragment_endpoint(
-    text: Annotated[str, Body()],
-    memory_id: Annotated[UUID, Body()],
-    fragment_id: Annotated[UUID, Body()],
-    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-) -> None:
-    """Modify an existing text Fragment."""
-    try:
-        await services.modify_text_fragment(memory_id, fragment_id, text, repo)
-    except Exception as e:
-        logger.exception(e)
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while modifying the fragment.",
         )
 
 

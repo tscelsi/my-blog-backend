@@ -40,6 +40,35 @@ def get_memory_repository_dep(request: Request) -> AbstractMemoryRepository:
     return repo
 
 
+class CreateMemoryResponse(BaseModel):
+    id: UUID
+
+
+@router.post("", response_model=CreateMemoryResponse, status_code=201)
+async def create_empty_memory(
+    request: Request,
+    memory_title: Annotated[str, Body()] = "blank_",
+    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+) -> CreateMemoryResponse:
+    """Create an empty memory."""
+    try:
+        new_memory_id = await services.create_empty_memory(
+            request.user.user_id, memory_title, repo
+        )
+    except MemoryAlreadyExistsError:
+        raise HTTPException(
+            status_code=400,
+            detail="Memory already exists.",
+        )
+    except Exception as e:
+        logger.exception(e)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while creating the memory.",
+        )
+    return CreateMemoryResponse(id=new_memory_id)
+
+
 @router.post("/from-file", status_code=201, response_model=None)
 async def create_memory_from_file(
     file: Annotated[UploadFile, File()],
@@ -63,32 +92,6 @@ async def create_memory_from_file(
             repo,
             service_manager.background_tasks,
             service_manager.pub,
-        )
-    except MemoryAlreadyExistsError as e:
-        logger.error(e)
-        raise HTTPException(
-            status_code=400,
-            detail="Memory already exists.",
-        )
-    except Exception as e:
-        logger.exception(e)
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while creating the memory.",
-        )
-
-
-@router.post("/from-text", status_code=201, response_model=None)
-async def create_memory_from_text(
-    text: Annotated[str, Body()],
-    memory_title: Annotated[str, Body()],
-    request: Request,
-    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-) -> None:
-    """Create a memory from text."""
-    try:
-        await services.create_memory_from_text(
-            request.user.user_id, memory_title, text, repo
         )
     except MemoryAlreadyExistsError as e:
         logger.error(e)
