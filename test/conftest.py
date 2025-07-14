@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -8,6 +9,7 @@ from memory_repository import InMemoryMemoryRepository
 from utils.file_storage.fake_storage import FakeStorage
 
 logger = logging.getLogger(__name__)
+TEST_DIR = Path(__file__).parent
 
 
 @pytest.fixture
@@ -44,3 +46,9 @@ async def sub(pub: LocalPublisher):
     )
     yield sub
     await sub.unsubscribe([])
+
+
+@pytest.fixture
+def rss_content():
+    with open(TEST_DIR / "rss.xml", "r") as file:
+        return file.read()

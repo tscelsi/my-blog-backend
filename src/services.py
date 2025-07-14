@@ -5,12 +5,14 @@ from uuid import UUID
 from events.pubsub import LocalPublisher
 from fragments.base import FragmentType
 from fragments.file import File, FileFragmentFactory
+from fragments.rss import RSSFeed
 from fragments.text import Op, RichText
 from memory import Memory
 from memory_repository import AbstractMemoryRepository
 from tags import Tag
 from utils.background_tasks import BackgroundTasks
 from utils.file_storage.base_storage import AbstractFileStorage
+from utils.rss_parser import RssItem
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +183,43 @@ async def add_rich_text_fragment_to_memory(
     memory.fragments.append(rtf)
     await memory_repo.update(memory)
     return rtf.id
+
+
+async def add_rss_feed_to_memory(
+    memory_id: UUID,
+    urls: list[str],
+    memory_repo: AbstractMemoryRepository,
+) -> UUID:
+    """Add an RSS feed to an existing Memory.
+
+    Args:
+        memory_id (UUID): The ID of the Memory to update.
+        url (str): The url of the RSS feed.
+        memory_repo (AbstractMemoryRepository): Repository of Memories.
+
+    Returns:
+        UUID: The ID of the updated Memory.
+    """
+    rssf = RSSFeed(urls=urls)
+    memory = await memory_repo.authenticated_get(memory_id)
+    memory.fragments.append(rssf)
+    await memory_repo.update(memory)
+    return rssf.id
+
+
+async def get_rss_feed_items(
+    memory_id: UUID,
+    fragment_id: UUID,
+    repo: AbstractMemoryRepository,
+) -> list[RssItem]:
+    """Parse the RSS feed and return the news items, sorted by publication
+    date."""
+    memory = await repo.authenticated_get(memory_id)
+    fragment = memory.get_fragment(fragment_id)
+    if not isinstance(fragment, RSSFeed):
+        raise TypeError(f"Fragment {fragment_id} is not an RSSFeed Fragment.")
+    items = await fragment.load_aggregated_feed()
+    return items
 
 
 async def modify_rich_text_fragment(
@@ -461,4 +500,5 @@ async def update_tags(
     """Update the tags associated with a memory."""
     memory = await memory_repo.authenticated_get(memory_id)
     memory.set_tags(tags)
+    await memory_repo.update_tags(memory)
     await memory_repo.update_tags(memory)

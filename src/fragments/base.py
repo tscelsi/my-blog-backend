@@ -14,6 +14,7 @@ class FragmentType(Enum):
     VIDEO = "video"
     TEXT = "text"
     RICH_TEXT = "rich_text"
+    RSS_FEED = "rss_feed"
 
 
 class BaseFragment(BaseModel):

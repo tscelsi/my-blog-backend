@@ -1,10 +1,16 @@
 import io
 
+import pytest
+from pytest_httpx import HTTPXMock
+
 from events.pubsub import LocalPublisher
 from fragments.base import FragmentType
 from fragments.file import File, FileFragmentStatus
+from fragments.rss import ListRssFeedError, RSSFeed
 from memory_repository import InMemoryMemoryRepository
 from services import (
+    add_rss_feed_to_memory,
+    create_empty_memory,
     create_memory_from_file,
     create_memory_from_rich_text,
     make_memory_private,
@@ -123,3 +129,35 @@ async def test_set_tags():
 
     updated_memory = await repo.authenticated_get(memory_id)
     assert updated_memory.tags == tags
+
+
+async def test_get_rss_feed_channel_bad_req(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(status_code=404)
+    repo = InMemoryMemoryRepository()
+    memory_id = await create_empty_memory(
+        USER_ID, "rsstest", InMemoryMemoryRepository()
+    )
+    fragment_id = await add_rss_feed_to_memory(
+        memory_id, ["https://example.com/rss"], repo
+    )
+    memory = await repo.authenticated_get(memory_id)
+    fragment = memory.get_fragment(fragment_id)
+    assert isinstance(fragment, RSSFeed)
+    with pytest.raises(ListRssFeedError):
+        await fragment.load_aggregated_feed()
+
+
+async def test_get_rss_feed_channel(httpx_mock: HTTPXMock, rss_content: str):
+    httpx_mock.add_response(status_code=200, text=rss_content)
+    repo = InMemoryMemoryRepository()
+    memory_id = await create_empty_memory(
+        USER_ID, "rsstest", InMemoryMemoryRepository()
+    )
+    fragment_id = await add_rss_feed_to_memory(
+        memory_id, ["https://example.com/rss"], repo
+    )
+    memory = await repo.authenticated_get(memory_id)
+    fragment = memory.get_fragment(fragment_id)
+    assert isinstance(fragment, RSSFeed)
+    feed = await fragment.load_aggregated_feed()
+    assert len(feed) == 10
