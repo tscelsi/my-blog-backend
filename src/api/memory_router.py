@@ -2,24 +2,12 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import (
-    APIRouter,
-    Body,
-    Depends,
-    File,
-    Form,
-    HTTPException,
-    Path,
-    Request,
-    UploadFile,
-)
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from pydantic import BaseModel
 
 import services
 from api.middleware.auth import require_auth_dep
 from api.service_manager import ServiceManager
-from fragments.base import FragmentType
-from fragments.text import Op
 from memory import BaseMemoryError, MemoryAlreadyExistsError
 from memory_repository import (
     AbstractMemoryRepository,
@@ -67,70 +55,6 @@ async def create_empty_memory(
             detail="An error occurred while creating the memory.",
         )
     return CreateMemoryResponse(id=new_memory_id)
-
-
-@router.post("/from-file", status_code=201, response_model=None)
-async def create_memory_from_file(
-    file: Annotated[UploadFile, File()],
-    memory_title: Annotated[str, Form()],
-    type: Annotated[FragmentType, Form()],
-    request: Request,
-    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-) -> None:
-    """Create a memory from a file."""
-    service_manager = ServiceManager.get()
-    logger.info("memory_title")
-    logger.info(memory_title)
-    try:
-        await services.create_memory_from_file(
-            request.user.user_id,
-            memory_title,
-            type,
-            file.filename or "_blank",
-            file.file,
-            service_manager.get_filesys(),
-            repo,
-            service_manager.background_tasks,
-            service_manager.pub,
-        )
-    except MemoryAlreadyExistsError as e:
-        logger.error(e)
-        raise HTTPException(
-            status_code=400,
-            detail="Memory already exists.",
-        )
-    except Exception as e:
-        logger.exception(e)
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while creating the memory.",
-        )
-
-
-@router.post("/from-rich-text", status_code=201, response_model=None)
-async def create_memory_from_rich_text(
-    content: Annotated[list[Op], Body()],
-    memory_title: Annotated[str, Body()],
-    request: Request,
-    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-) -> None:
-    """Create a memory from rich text representation."""
-    try:
-        await services.create_memory_from_rich_text(
-            request.user.user_id, memory_title, content, repo
-        )
-    except MemoryAlreadyExistsError as e:
-        logger.error(e)
-        raise HTTPException(
-            status_code=400,
-            detail="Memory already exists.",
-        )
-    except Exception as e:
-        logger.exception(e)
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while creating the memory.",
-        )
 
 
 class MemoryMergeRequest(BaseModel):

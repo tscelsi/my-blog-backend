@@ -40,17 +40,17 @@ def get_memory_repository_dep(request: Request) -> AbstractMemoryRepository:
     return repo
 
 
-class AddFragmentResponse(BaseModel):
+class Response(BaseModel):
     fragment_id: UUID
 
 
-@router.post("/file", status_code=201, response_model=AddFragmentResponse)
+@router.post("/file", status_code=201, response_model=Response)
 async def add_file_fragment_to_memory_endpoint(
     file: Annotated[UploadFile, File()],
     memory_id: Annotated[UUID, Form()],
     type: Annotated[FragmentType, Form()],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-) -> AddFragmentResponse:
+) -> Response:
     """Add a file Fragment to a Memory."""
     service_manager = ServiceManager.get()
     try:
@@ -64,7 +64,7 @@ async def add_file_fragment_to_memory_endpoint(
             service_manager.background_tasks,
             service_manager.pub,
         )
-        return AddFragmentResponse(fragment_id=fragment_id)
+        return Response(fragment_id=fragment_id)
     except Exception as e:
         logger.exception(e)
         raise HTTPException(
@@ -73,18 +73,18 @@ async def add_file_fragment_to_memory_endpoint(
         )
 
 
-@router.post("/rich-text", status_code=201, response_model=AddFragmentResponse)
+@router.post("/rich-text", status_code=201, response_model=Response)
 async def add_rich_text_fragment_to_memory_endpoint(
     content: Annotated[list[Op], Body()],
     memory_id: Annotated[UUID, Body()],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-) -> AddFragmentResponse:
+) -> Response:
     """Add a rich text Fragment to a Memory."""
     try:
         fragment_id = await services.add_rich_text_fragment_to_memory(
             memory_id, content, repo
         )
-        return AddFragmentResponse(fragment_id=fragment_id)
+        return Response(fragment_id=fragment_id)
     except Exception as e:
         logger.exception(e)
         raise HTTPException(
@@ -93,19 +93,19 @@ async def add_rich_text_fragment_to_memory_endpoint(
         )
 
 
-@router.put("/rich-text", status_code=201, response_model=AddFragmentResponse)
+@router.put("/rich-text", status_code=201, response_model=Response)
 async def modify_rich_text_fragment_endpoint(
     content: Annotated[list[Op], Body()],
     memory_id: Annotated[UUID, Body()],
     fragment_id: Annotated[UUID, Body()],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-) -> AddFragmentResponse:
+) -> Response:
     """Modify an existing rich text Fragment."""
     try:
         fragment_id = await services.modify_rich_text_fragment(
             memory_id, fragment_id, content, repo
         )
-        return AddFragmentResponse(fragment_id=fragment_id)
+        return Response(fragment_id=fragment_id)
     except Exception as e:
         logger.exception(e)
         raise HTTPException(
@@ -114,18 +114,18 @@ async def modify_rich_text_fragment_endpoint(
         )
 
 
-@router.post("/rss", status_code=201, response_model=AddFragmentResponse)
+@router.post("/rss", status_code=201, response_model=Response)
 async def add_rss_feed_fragment_to_memory_endpoint(
     urls: Annotated[list[str], Body()],
     memory_id: Annotated[UUID, Body()],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-) -> AddFragmentResponse:
+) -> Response:
     """Add an RSS feed Fragment to a Memory."""
     try:
         fragment_id = await services.add_rss_feed_to_memory(
             memory_id, urls, repo
         )
-        return AddFragmentResponse(fragment_id=fragment_id)
+        return Response(fragment_id=fragment_id)
     except Exception as e:
         logger.exception(e)
         raise HTTPException(
@@ -153,3 +153,25 @@ async def get_rss_feed_channel_endpoint(
             detail="An error occurred while retrieving the RSS feed of a fragment.",  # noqa: E501
         )
     return items
+
+
+@router.put("/rss", status_code=201, response_model=Response)
+async def modify_rss_feed_fragment_endpoint(
+    urls: Annotated[list[str], Body()],
+    memory_id: Annotated[UUID, Body()],
+    fragment_id: Annotated[UUID, Body()],
+    n_items: Annotated[int | None, Body()] = None,
+    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+) -> Response:
+    """Add an RSS feed Fragment to a Memory."""
+    try:
+        fragment_id = await services.modify_rss_feed_fragment(
+            memory_id, fragment_id, urls, repo, n_items=n_items
+        )
+        return Response(fragment_id=fragment_id)
+    except Exception as e:
+        logger.exception(e)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while modifying an RSS fragment.",
+        )

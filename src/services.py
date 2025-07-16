@@ -222,6 +222,35 @@ async def get_rss_feed_items(
     return items
 
 
+async def modify_rss_feed_fragment(
+    memory_id: UUID,
+    fragment_id: UUID,
+    urls: list[str],
+    memory_repo: AbstractMemoryRepository,
+    n_items: int | None = None,
+) -> UUID:
+    """Modify an existing RSS feed fragment.
+
+    Args:
+        memory_id (UUID): The ID of the Memory to update.
+        fragment_id (UUID): The ID of the RSS feed fragment to modify.
+        urls (list[str]): The new URLs for the RSS feed.
+        memory_repo (AbstractMemoryRepository): Repository of Memories.
+
+    Returns:
+        UUID: The ID of the updated Memory.
+    """
+    memory = await memory_repo.authenticated_get(memory_id)
+    fragment = memory.get_fragment(fragment_id)
+    if not isinstance(fragment, RSSFeed):
+        raise TypeError(f"Fragment {fragment_id} is not an RSSFeed Fragment.")
+    fragment.urls = urls
+    if n_items is not None:
+        fragment.n_items = n_items
+    await memory_repo.update(memory)
+    return fragment.id
+
+
 async def modify_rich_text_fragment(
     memory_id: UUID,
     fragment_id: UUID,
