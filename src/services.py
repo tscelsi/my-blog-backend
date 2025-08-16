@@ -2,99 +2,80 @@ import logging
 from typing import BinaryIO
 from uuid import UUID
 
+from entities.fragments.base import FragmentType
+from entities.fragments.file import File, FileFragmentFactory
+from entities.fragments.rss import RSSFeed
+from entities.fragments.text import Op, RichText
+from entities.memory import Memory
+from entities.user import User
 from events.pubsub import LocalPublisher
-from fragments.base import FragmentType
-from fragments.file import File, FileFragmentFactory
-from fragments.rss import RSSFeed
-from fragments.text import Op, RichText
-from memory import Memory
 from memory_repository import AbstractMemoryRepository
 from tags import Tag
 from utils.background_tasks import BackgroundTasks
 from utils.file_storage.base_storage import AbstractFileStorage
+from utils.permissions.authorise import inline_authorise
 from utils.rss_parser import RssItem
 
 logger = logging.getLogger(__name__)
 
 
 async def create_empty_memory(
-    user_id: UUID,
+    user: User,
     memory_title: str,
     memory_repo: AbstractMemoryRepository,
 ) -> UUID:
     """Create an empty Memory.
 
     Args:
-        user_id (UUID): The ID of the user.
+        user (User): The authenticated user.
         memory_title (str): The title of the Memory.
         memory_repo (AbstractMemoryRepository): Repository of Memories.
 
     Returns:
         UUID: The ID of the newly created Memory.
     """
-    memory = Memory(title=memory_title, user_id=user_id)
-    await memory_repo.create(memory)  # commits
+    memory = Memory(title=memory_title, owner=user.id, created_by=user.id)
+    await memory_repo.create_empty(memory)
     return memory.id
 
 
-async def create_memory_from_file(
-    user_id: UUID,
-    memory_title: str,
-    type: FragmentType,
-    filename: str,
-    file: BinaryIO,
-    ifilesys: AbstractFileStorage,
+async def list_memories(
     memory_repo: AbstractMemoryRepository,
-    background_tasks: BackgroundTasks,
-    pub: LocalPublisher,
-) -> UUID:
-    """Create a Memory from a file.
+):
+    """List all Memories for the authenticated user.
 
     Args:
-        user_id (UUID): The ID of the user.
-        memory_title (str): The title of the Memory.
-        filename (str): The name of the file.
-        file (BinaryIO): The file to save, opened in binary mode.
-        ifilesys (AbstractFileStorage): The file system interface.
         memory_repo (AbstractMemoryRepository): Repository of Memories.
-        background_tasks (BackgroundTasks): Background task runner.
-        pub (LocalPublisher): Event publisher.
 
     Returns:
-        UUID: The ID of the newly created Memory.
+        list[Memory]: List of Memories owned by the user.
     """
-    ff = FileFragmentFactory.create_file_fragment(filename, type=type)
-    memory = Memory(title=memory_title, user_id=user_id, fragments=[ff])
-    await memory_repo.create(memory)  # commits
-    background_tasks.add(save_file, ff, memory, file.read(), ifilesys, pub)
-    return memory.id
+    result = await memory_repo.authenticated_list_all()
+    return result
 
 
-async def create_memory_from_rich_text(
-    user_id: UUID,
-    memory_title: str,
-    content: list[Op],
+async def get_memory(
+    user: User,
+    memory_id: UUID,
     memory_repo: AbstractMemoryRepository,
-) -> UUID:
-    """Create a Memory from a rich text representation.
+) -> Memory:
+    """Get a Memory by its ID.
 
     Args:
-        user_id (UUID): The ID of the user.
-        memory_title (str): The title of the Memory.
-        content (list[Op]): The list of Delta operations making up the rich
-            text content.
+        user (User): The authenticated user.
+        memory_id (UUID): The ID of the Memory to retrieve.
         memory_repo (AbstractMemoryRepository): Repository of Memories.
 
     Returns:
-        UUID: The ID of the newly created Memory.
+        Memory: The Memory object.
     """
-    rtf = RichText.from_content(content=content)
-    memory = Memory(title=memory_title, user_id=user_id, fragments=[rtf])
-    await memory_repo.create(memory)  # commits
-    return memory.id
+    memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"GetMemory"', memory)
+    return memory
 
 
 async def update_memory_title(
+    user: User,
     memory_id: UUID,
     title: str,
     memory_repo: AbstractMemoryRepository,
@@ -102,17 +83,20 @@ async def update_memory_title(
     """Update the title of a Memory.
 
     Args:
+        user (User): The authenticated user.
         memory_id (UUID): The ID of the Memory to update.
         title (str): The new title for the Memory.
         memory_repo (AbstractMemoryRepository): Repository of Memories.
     """
     memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"UpdateMemoryTitle"', memory)
     memory.title = title
     await memory_repo.update(memory)
     return memory.id
 
 
 async def update_memory_fragment_ordering(
+    user: User,
     memory_id: UUID,
     fragment_ids: list[UUID],
     memory_repo: AbstractMemoryRepository,
@@ -120,17 +104,20 @@ async def update_memory_fragment_ordering(
     """Update the ordering of fragments in a Memory.
 
     Args:
+        user (User): The authenticated user.
         memory_id (UUID): The ID of the Memory to update.
         fragment_ids (list[UUID]): The IDs of the fragments in the new order.
         memory_repo (AbstractMemoryRepository): Repository of Memories.
     """
     memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"UpdateFragmentOrder"', memory)
     memory.update_fragment_ordering(fragment_ids)
     await memory_repo.update(memory)
     return memory.id
 
 
 async def add_file_fragment_to_memory(
+    user: User,
     memory_id: UUID,
     type: FragmentType,
     filename: str,
@@ -143,6 +130,7 @@ async def add_file_fragment_to_memory(
     """Add a file fragment to an existing Memory.
 
     Args:
+        user (User): The authenticated user.
         memory_id (UUID): The ID of the Memory to update.
         type (FragmentType): The type of the file fragment.
         filename (str): The name of the file.
@@ -157,6 +145,7 @@ async def add_file_fragment_to_memory(
     """
     ff = FileFragmentFactory.create_file_fragment(filename, type=type)
     memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"CreateFragment"', memory)
     memory.fragments.append(ff)
     await memory_repo.update(memory)
     background_tasks.add(save_file, ff, memory, file.read(), ifilesys, pub)
@@ -164,6 +153,7 @@ async def add_file_fragment_to_memory(
 
 
 async def add_rich_text_fragment_to_memory(
+    user: User,
     memory_id: UUID,
     content: list[Op],
     memory_repo: AbstractMemoryRepository,
@@ -171,6 +161,7 @@ async def add_rich_text_fragment_to_memory(
     """Add a rich text fragment to an existing Memory.
 
     Args:
+        user (User): The authenticated user.
         memory_id (UUID): The ID of the Memory to update.
         content (list[Op]): The content of the rich text fragment.
         memory_repo (AbstractMemoryRepository): Repository of Memories.
@@ -180,12 +171,14 @@ async def add_rich_text_fragment_to_memory(
     """
     rtf = RichText.from_content(content=content)
     memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"CreateFragment"', memory)
     memory.fragments.append(rtf)
     await memory_repo.update(memory)
     return rtf.id
 
 
 async def add_rss_feed_to_memory(
+    user: User,
     memory_id: UUID,
     urls: list[str],
     memory_repo: AbstractMemoryRepository,
@@ -193,6 +186,7 @@ async def add_rss_feed_to_memory(
     """Add an RSS feed to an existing Memory.
 
     Args:
+        user (User): The authenticated user.
         memory_id (UUID): The ID of the Memory to update.
         url (str): The url of the RSS feed.
         memory_repo (AbstractMemoryRepository): Repository of Memories.
@@ -202,12 +196,14 @@ async def add_rss_feed_to_memory(
     """
     rssf = RSSFeed(urls=urls)
     memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"CreateFragment"', memory)
     memory.fragments.append(rssf)
     await memory_repo.update(memory)
     return rssf.id
 
 
 async def get_rss_feed_items(
+    user: User,
     memory_id: UUID,
     fragment_id: UUID,
     repo: AbstractMemoryRepository,
@@ -215,6 +211,7 @@ async def get_rss_feed_items(
     """Parse the RSS feed and return the news items, sorted by publication
     date."""
     memory = await repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"GetMemory"', memory)
     fragment = memory.get_fragment(fragment_id)
     if not isinstance(fragment, RSSFeed):
         raise TypeError(f"Fragment {fragment_id} is not an RSSFeed Fragment.")
@@ -223,6 +220,7 @@ async def get_rss_feed_items(
 
 
 async def modify_rss_feed_fragment(
+    user: User,
     memory_id: UUID,
     fragment_id: UUID,
     urls: list[str],
@@ -232,6 +230,7 @@ async def modify_rss_feed_fragment(
     """Modify an existing RSS feed fragment.
 
     Args:
+        user (User): The authenticated user.
         memory_id (UUID): The ID of the Memory to update.
         fragment_id (UUID): The ID of the RSS feed fragment to modify.
         urls (list[str]): The new URLs for the RSS feed.
@@ -241,6 +240,7 @@ async def modify_rss_feed_fragment(
         UUID: The ID of the updated Memory.
     """
     memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"UpdateFragment"', memory)
     fragment = memory.get_fragment(fragment_id)
     if not isinstance(fragment, RSSFeed):
         raise TypeError(f"Fragment {fragment_id} is not an RSSFeed Fragment.")
@@ -252,6 +252,7 @@ async def modify_rss_feed_fragment(
 
 
 async def modify_rich_text_fragment(
+    user: User,
     memory_id: UUID,
     fragment_id: UUID,
     content: list[Op],
@@ -260,6 +261,7 @@ async def modify_rich_text_fragment(
     """Modify an existing rich text fragment.
 
     Args:
+        user (User): The authenticated user.
         memory_id (UUID): The ID of the Memory to update.
         fragment_id (UUID): The ID of the rich text fragment to modify.
         text (str): The content of the updated rich text fragment.
@@ -269,6 +271,7 @@ async def modify_rich_text_fragment(
         UUID: The ID of the updated Memory.
     """
     memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"UpdateFragment"', memory)
     fragment = memory.get_fragment(fragment_id)
     if not isinstance(fragment, RichText):
         raise TypeError(f"Fragment {fragment_id} is not a RichTextFragment.")
@@ -298,7 +301,7 @@ async def save_file(
         `filesys_save_success`: Updates the FileFragment for success.
     """
     try:
-        key = fragment.gen_key(memory.user_id)
+        key = fragment.gen_key(memory.owner)
         await ifilesys.save(key, data)
     except Exception as e:
         logger.error(f"Error uploading fragment: {fragment}")
@@ -364,7 +367,7 @@ async def save_file_fragment_upload_success(
     if not isinstance(fragment, File):
         raise TypeError(f"Fragment {file_fragment_id} is not a FileFragment.")
     fragment.set_upload_succeeded()
-    key = fragment.gen_key(memory.user_id)
+    key = fragment.gen_key(memory.owner)
     url = await ifilesys.generate_presigned_url(key)
     fragment.url = url
     await repo.update(memory)
@@ -388,44 +391,8 @@ async def save_file_fragment_upload_error(
     await repo.update(memory)
 
 
-async def merge_memories(
-    memory_a_id: UUID,
-    memory_b_id: UUID,
-    memory_repo: AbstractMemoryRepository,
-):
-    """Merge Memory B into Memory A.
-
-    Args:
-        memory_a_id (UUID): The ID of the memory to expand.
-        memory_b_id (UUID): The ID of the memory being merged.
-        memory_repo (AbstractMemoryRepository): Repository of Memories.
-    """
-    main_memory = await memory_repo.authenticated_get(memory_a_id)
-    merging_memory = await memory_repo.authenticated_get(memory_b_id)
-    main_memory.merge(merging_memory)
-    await memory_repo.update(main_memory)
-    await memory_repo.delete(merging_memory)
-
-
-async def split_memory(
-    memory_id: UUID,
-    fragment_ids: list[UUID],
-    memory_repo: AbstractMemoryRepository,
-):
-    """Split a Memory in two.
-
-    Args:
-        memory_id (UUID): The ID of the memory to split.
-        fragment_ids (list[UUID]): The IDs of the fragments to split.
-        memory_repo (AbstractMemoryRepository): Repository of Memories.
-    """
-    memory = await memory_repo.authenticated_get(memory_id)
-    old_memory, new_memory = memory.split(fragment_ids)
-    await memory_repo.update(old_memory)
-    await memory_repo.create(new_memory)
-
-
 async def forget_fragments(
+    user: User,
     memory_id: UUID,
     fragment_ids: list[UUID],
     ifilesys: AbstractFileStorage,
@@ -444,11 +411,12 @@ async def forget_fragments(
         pub (LocalPublisher): Event publisher.
     """
     memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"DeleteFragment"', memory)
     file_keys: list[str] = []
     for fragment_id in fragment_ids:
         fragment = memory.get_fragment(fragment_id)
         if isinstance(fragment, File):
-            file_keys.append(fragment.gen_key(memory.user_id))
+            file_keys.append(fragment.gen_key(memory.owner))
         memory.forget_fragment(fragment_id)
     await memory_repo.update(memory)
     for key in file_keys:
@@ -456,6 +424,7 @@ async def forget_fragments(
 
 
 async def forget_memory(
+    user: User,
     memory_id: UUID,
     ifilesys: AbstractFileStorage,
     memory_repo: AbstractMemoryRepository,
@@ -472,10 +441,11 @@ async def forget_memory(
         pub (LocalPublisher): Event publisher.
     """
     memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"DeleteMemory"', memory)
     file_keys: list[str] = []
     for fragment in memory.fragments:
         if isinstance(fragment, File):
-            file_keys.append(fragment.gen_key(memory.user_id))
+            file_keys.append(fragment.gen_key(memory.owner))
     await memory_repo.delete(memory)
     for key in file_keys:
         background_tasks.add(delete_file, key, ifilesys, pub)
@@ -502,32 +472,38 @@ async def make_memory_private(
 
 
 async def pin_memory(
+    user: User,
     memory_id: UUID,
     memory_repo: AbstractMemoryRepository,
 ):
     """Pin a memory."""
     memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"EditPin"', memory)
     memory.pin()
     await memory_repo.update_pin_status(memory)
 
 
 async def unpin_memory(
+    user: User,
     memory_id: UUID,
     memory_repo: AbstractMemoryRepository,
 ):
     """Unpin a memory."""
     memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"EditPin"', memory)
     memory.unpin()
     await memory_repo.update_pin_status(memory)
 
 
 async def update_tags(
+    user: User,
     memory_id: UUID,
     tags: set[Tag],
     memory_repo: AbstractMemoryRepository,
 ):
     """Update the tags associated with a memory."""
     memory = await memory_repo.authenticated_get(memory_id)
+    inline_authorise(user, 'Action::"EditTags"', memory)
     memory.set_tags(tags)
     await memory_repo.update_tags(memory)
     await memory_repo.update_tags(memory)

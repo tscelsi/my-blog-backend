@@ -1,18 +1,15 @@
-import io
-
+from test import fixtures
 import pytest
 from pytest_httpx import HTTPXMock
 
+from entities.fragments.file import File
+from entities.fragments.rss import ListRssFeedError, RSSFeed
+from entities.user import User
 from events.pubsub import LocalPublisher
-from fragments.base import FragmentType
-from fragments.file import File, FileFragmentStatus
-from fragments.rss import ListRssFeedError, RSSFeed
 from memory_repository import InMemoryMemoryRepository
 from services import (
     add_rss_feed_to_memory,
     create_empty_memory,
-    create_memory_from_file,
-    create_memory_from_rich_text,
     make_memory_private,
     make_memory_public,
     pin_memory,
@@ -21,18 +18,16 @@ from services import (
     update_tags,
 )
 from tags import Tag
-from utils.background_tasks import BackgroundTasks
 from utils.file_storage.fake_storage import FakeStorage
 
-from .fixtures import USER_ID, create_memory
 
-
-class FakeFile(io.BytesIO):
-    name: str = "test file"
+@pytest.fixture
+def user():
+    return fixtures.create_user()
 
 
 async def test_save_file(ifilesys: FakeStorage, pub: LocalPublisher):
-    m = create_memory()
+    m = fixtures.create_memory()
     file_fragment = m.fragments[0]
     assert isinstance(file_fragment, File)
     await save_file(file_fragment, m, b"x0", ifilesys, pub)
@@ -40,7 +35,7 @@ async def test_save_file(ifilesys: FakeStorage, pub: LocalPublisher):
 
 
 async def test_save_file_error(ifilesys: FakeStorage, pub: LocalPublisher):
-    m = create_memory()
+    m = fixtures.create_memory()
     file_fragment = m.fragments[0]
     assert isinstance(file_fragment, File)
     await save_file(
@@ -53,35 +48,10 @@ async def test_save_file_error(ifilesys: FakeStorage, pub: LocalPublisher):
     assert pub._latest_event["topic"] == "filesys_save_error"  # type: ignore
 
 
-async def test_save_file_as_memory(ifilesys: FakeStorage, pub: LocalPublisher):
+async def test_finalise_memory(user: User):
     repo = InMemoryMemoryRepository()
-    background_tasks = BackgroundTasks()
-    file_data = io.BytesIO(b"x0")
-    file_name = "test file"
-    memory_id = await create_memory_from_file(
-        USER_ID,
-        "test memory title",
-        FragmentType.FILE,
-        file_name,
-        file_data,
-        ifilesys,
-        repo,
-        background_tasks,
-        pub,
-    )
-    memory = await repo.authenticated_get(memory_id)
-    file_fragment = memory.fragments[0]
-    assert isinstance(file_fragment, File)
-    assert file_fragment.status == FileFragmentStatus.UPLOADING
-    assert background_tasks.size == 1
-    await background_tasks.join()
-    assert pub._latest_event["topic"] == "filesys_save_success"  # type: ignore  # noqa
-
-
-async def test_finalise_memory():
-    repo = InMemoryMemoryRepository()
-    memory_id = await create_memory_from_rich_text(
-        USER_ID, "test memory title", [], InMemoryMemoryRepository()
+    memory_id = await create_empty_memory(
+        user, "test memory title", InMemoryMemoryRepository()
     )
     await make_memory_public(memory_id, repo)
     memory = await repo.authenticated_get(memory_id)
@@ -97,20 +67,20 @@ async def test_finalise_memory():
     )
 
 
-async def test_pin_memory():
+async def test_pin_memory(user: User):
     repo = InMemoryMemoryRepository()
-    memory_id = await create_memory_from_rich_text(
-        USER_ID, "test memory title", [], InMemoryMemoryRepository()
+    memory_id = await create_empty_memory(
+        user, "test memory title", InMemoryMemoryRepository()
     )
     memory = await repo.authenticated_get(memory_id)
     assert memory.pinned is False
 
-    await pin_memory(memory_id, repo)
+    await pin_memory(user, memory_id, repo)
     memory = await repo.authenticated_get(memory_id)
     old_updated_at = memory.updated_at
     assert memory.pinned is True
 
-    await unpin_memory(memory_id, repo)
+    await unpin_memory(user, memory_id, repo)
     memory = await repo.authenticated_get(memory_id)
     new_updated_at = memory.updated_at
     assert memory.pinned is False
@@ -119,26 +89,26 @@ async def test_pin_memory():
     )
 
 
-async def test_set_tags():
+async def test_set_tags(user: User):
     repo = InMemoryMemoryRepository()
-    memory_id = await create_memory_from_rich_text(
-        USER_ID, "test memory title", [], InMemoryMemoryRepository()
+    memory_id = await create_empty_memory(
+        user, "test memory title", InMemoryMemoryRepository()
     )
     tags = {Tag.music, Tag.software}
-    await update_tags(memory_id, tags, repo)
+    await update_tags(user, memory_id, tags, repo)
 
     updated_memory = await repo.authenticated_get(memory_id)
     assert updated_memory.tags == tags
 
 
-async def test_get_rss_feed_channel_bad_req(httpx_mock: HTTPXMock):
+async def test_get_rss_feed_channel_bad_req(user: User, httpx_mock: HTTPXMock):
     httpx_mock.add_response(status_code=404)
     repo = InMemoryMemoryRepository()
     memory_id = await create_empty_memory(
-        USER_ID, "rsstest", InMemoryMemoryRepository()
+        user, "rsstest", InMemoryMemoryRepository()
     )
     fragment_id = await add_rss_feed_to_memory(
-        memory_id, ["https://example.com/rss"], repo
+        user, memory_id, ["https://example.com/rss"], repo
     )
     memory = await repo.authenticated_get(memory_id)
     fragment = memory.get_fragment(fragment_id)
@@ -147,17 +117,29 @@ async def test_get_rss_feed_channel_bad_req(httpx_mock: HTTPXMock):
         await fragment.load_aggregated_feed()
 
 
-async def test_get_rss_feed_channel(httpx_mock: HTTPXMock, rss_content: str):
+async def test_get_rss_feed_channel(
+    user: User, httpx_mock: HTTPXMock, rss_content: str
+):
     httpx_mock.add_response(status_code=200, text=rss_content)
     repo = InMemoryMemoryRepository()
     memory_id = await create_empty_memory(
-        USER_ID, "rsstest", InMemoryMemoryRepository()
+        user, "rsstest", InMemoryMemoryRepository()
     )
     fragment_id = await add_rss_feed_to_memory(
-        memory_id, ["https://example.com/rss"], repo
+        user, memory_id, ["https://example.com/rss"], repo
     )
     memory = await repo.authenticated_get(memory_id)
     fragment = memory.get_fragment(fragment_id)
     assert isinstance(fragment, RSSFeed)
     feed = await fragment.load_aggregated_feed()
     assert len(feed) == 10
+
+
+async def test_create_memory_creates_permissions(user: User):
+    repo = InMemoryMemoryRepository()
+    memory_id = await create_empty_memory(user, "test", repo)
+    assert memory_id is not None
+    memory = await repo.authenticated_get(memory_id)
+    assert memory is not None
+    assert memory.owner == user.id
+    assert memory.readers == set()

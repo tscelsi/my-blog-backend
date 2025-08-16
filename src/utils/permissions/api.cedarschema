@@ -1,0 +1,45 @@
+entity User {
+    "account"?: Account
+};
+entity Account {
+    "owner": User
+};
+entity Memory in Account {
+    "editors": Set<User>,
+    "owner": User,
+    "readers": Set<User>,
+};
+
+// read actions
+
+action GetMemory appliesTo {
+    principal: User,
+    resource: Memory
+};
+
+action ListMemorySummaries appliesTo {  // not memory-specific so we use the Account container as the resource
+    principal: User,
+    resource: Account
+};
+
+// edit actions
+
+action SharedMemoryEditActions, OwnerMemoryEditActions appliesTo {
+    principal: User,
+    resource: Memory
+};
+
+action DeleteMemory, EditShare, EditPin, EditTags in [OwnerMemoryEditActions] appliesTo {
+    principal: User,
+    resource: Memory
+};
+
+action UpdateMemoryTitle, UpdateFragmentOrder, CreateFragment, UpdateFragment, DeleteFragment in [SharedMemoryEditActions] appliesTo {
+    principal: User,
+    resource: Memory
+};
+
+action CreateMemory appliesTo {
+    principal: User,
+    resource: Account
+};

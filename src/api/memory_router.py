@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -8,12 +9,18 @@ from pydantic import BaseModel
 import services
 from api.middleware.auth import require_auth_dep
 from api.service_manager import ServiceManager
-from memory import BaseMemoryError, MemoryAlreadyExistsError
+from entities.memory import (
+    BaseMemoryError,
+    Memory,
+    MemoryAlreadyExistsError,
+    MemoryNotFoundError,
+)
 from memory_repository import (
     AbstractMemoryRepository,
     SupabaseMemoryRepository,
 )
 from tags import Tag
+from utils.permissions.authorise import AuthorisationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -41,13 +48,13 @@ async def create_empty_memory(
     """Create an empty memory."""
     try:
         new_memory_id = await services.create_empty_memory(
-            request.user.user_id, memory_title, repo
+            request.user, memory_title, repo
         )
     except MemoryAlreadyExistsError:
-        raise HTTPException(
-            status_code=400,
-            detail="Memory already exists.",
-        )
+        raise HTTPException(status_code=400, detail="Memory already exists.")
+    except AuthorisationError as e:
+        logger.error(f"Authorisation error: {e.detail}")
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         logger.exception(e)
         raise HTTPException(
@@ -57,50 +64,50 @@ async def create_empty_memory(
     return CreateMemoryResponse(id=new_memory_id)
 
 
-class MemoryMergeRequest(BaseModel):
-    """Merge Memory B into Memory A."""
+class ListMemoryResponse(BaseModel):
+    id: UUID
+    title: str
+    pinned: bool
+    private: bool
+    created_at: datetime
 
-    memory_a_id: UUID
-    memory_b_id: UUID
 
-
-@router.post("/merge", response_model=None, status_code=204)
-async def merge_memories(
-    body: MemoryMergeRequest,
+@router.get("", response_model=list[ListMemoryResponse], status_code=200)
+async def list_user_memories(
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
 ):
-    """Merge my memories."""
+    """List a user's memories."""
     try:
-        await services.merge_memories(body.memory_a_id, body.memory_b_id, repo)
-    except BaseMemoryError as e:
-        logger.error(e)
-        raise HTTPException(status_code=400, detail=str(e))
+        memories = await services.list_memories(repo)
     except Exception as e:
-        logger.error(f"Error merging memories: {e}")
         logger.exception(e)
-        return HTTPException(status_code=500, detail="Error merging memories")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while creating the memory.",
+        )
+    return memories
 
 
-@router.post("/{memory_id}/split", response_model=None, status_code=204)
-async def split_memory(
-    memory_id: Annotated[UUID, Path()],
-    fragment_ids: Annotated[list[UUID], Body(embed=True)],
+@router.get("/{memory_id}", response_model=Memory, status_code=200)
+async def get_memory(
+    request: Request,
+    memory_id: UUID,
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
 ):
-    """Split a memory in two."""
+    """Get a memory."""
     try:
-        await services.split_memory(memory_id, fragment_ids, repo)
-    except BaseMemoryError as e:
-        logger.error(e)
-        raise HTTPException(status_code=400, detail=str(e))
+        memory = await services.get_memory(request.user, memory_id, repo)
+    except MemoryNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"Error splitting memory: {e}")
         logger.exception(e)
-        return HTTPException(status_code=500, detail="Error splitting memory")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    return memory
 
 
 @router.post("/{memory_id}/forget", status_code=204)
 async def forget_memory(
+    request: Request,
     memory_id: Annotated[UUID, Path()],
     fragment_ids: Annotated[list[UUID] | None, Body(embed=True)] = None,
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
@@ -110,6 +117,7 @@ async def forget_memory(
     try:
         if not fragment_ids:
             await services.forget_memory(
+                request.user,
                 memory_id,
                 service_manager.get_filesys(),
                 repo,
@@ -118,6 +126,7 @@ async def forget_memory(
             )
         else:
             await services.forget_fragments(
+                request.user,
                 memory_id,
                 fragment_ids,
                 service_manager.get_filesys(),
@@ -159,6 +168,7 @@ async def mark_memory_as_draft(
 
 @router.put("/{memory_id}/set-pin", status_code=204)
 async def pin_memory(
+    request: Request,
     memory_id: Annotated[UUID, Path()],
     pin: Annotated[bool, Body(embed=True)],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
@@ -166,9 +176,9 @@ async def pin_memory(
     """Pin or unpin a memory."""
     try:
         if pin:
-            await services.pin_memory(memory_id, repo)
+            await services.pin_memory(request.user, memory_id, repo)
         else:
-            await services.unpin_memory(memory_id, repo)
+            await services.unpin_memory(request.user, memory_id, repo)
     except BaseMemoryError as e:
         logger.error(e)
         raise HTTPException(status_code=400, detail=str(e))
@@ -180,13 +190,14 @@ async def pin_memory(
 
 @router.put("/{memory_id}/set-tags", status_code=204)
 async def tag_memory(
+    request: Request,
     memory_id: Annotated[UUID, Path()],
     tags: Annotated[set[Tag], Body(embed=True)],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
 ):
     """Tag a memory."""
     try:
-        await services.update_tags(memory_id, tags, repo)
+        await services.update_tags(request.user, memory_id, tags, repo)
     except BaseMemoryError as e:
         logger.error(e)
         raise HTTPException(status_code=400, detail=str(e))
@@ -198,6 +209,7 @@ async def tag_memory(
 
 @router.put("/{memory_id}/set-fragment-order", status_code=204)
 async def set_fragment_ordering(
+    request: Request,
     memory_id: Annotated[UUID, Path()],
     fragment_ids: Annotated[list[UUID], Body(embed=True)],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
@@ -205,11 +217,14 @@ async def set_fragment_ordering(
     """Update ordering of fragments in a Memory."""
     try:
         await services.update_memory_fragment_ordering(
-            memory_id, fragment_ids, repo
+            request.user, memory_id, fragment_ids, repo
         )
     except BaseMemoryError as e:
         logger.error(e)
         raise HTTPException(status_code=400, detail=str(e))
+    except AuthorisationError as e:
+        logger.error(f"Authorisation error: {e.detail}")
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         logger.error(f"Error re-ordering fragments: {e}")
         logger.exception(e)
@@ -220,16 +235,22 @@ async def set_fragment_ordering(
 
 @router.put("/{memory_id}/set-memory-title", status_code=204)
 async def set_memory_title(
+    request: Request,
     memory_id: Annotated[UUID, Path()],
     memory_title: Annotated[str, Body(embed=True)],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
 ):
     """Change a memories title."""
     try:
-        await services.update_memory_title(memory_id, memory_title, repo)
+        await services.update_memory_title(
+            request.user, memory_id, memory_title, repo
+        )
     except BaseMemoryError as e:
         logger.error(e)
         raise HTTPException(status_code=400, detail=str(e))
+    except AuthorisationError as e:
+        logger.error(f"Authorisation error: {e.detail}")
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         logger.error(f"Error changing memory title: {e}")
         logger.exception(e)

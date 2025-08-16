@@ -1,6 +1,6 @@
 from typing import Any
 
-from fragments.base import BaseFragment, FragmentType
+from .base import BaseFragment, FragmentType
 
 Op = dict[str, Any]
 

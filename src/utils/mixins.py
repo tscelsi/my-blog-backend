@@ -12,3 +12,5 @@ class AuditMixin(BaseModel):
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(tz=timezone.utc)
     )
+    updated_by: UUID | None = Field(default=None)
+    created_by: UUID

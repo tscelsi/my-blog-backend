@@ -1,42 +1,53 @@
-from test.fixtures import create_file_fragment, create_text_fragment
 from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
 
-from fragments.base import FragmentType
-from fragments.file import Audio, File, FileFragmentFactory, FileFragmentStatus
+from entities.fragments.base import FragmentType
+from entities.fragments.file import (
+    Audio,
+    File,
+    FileFragmentFactory,
+    FileFragmentStatus,
+)
+from test import fixtures
 
 
 def test_fragment_init():
-    f = create_file_fragment(name="a test file")
+    f = fixtures.create_file_fragment(name="a test file")
     assert isinstance(f, File)
     assert f.status == FileFragmentStatus.UPLOADING
 
 
 def test_file_fragment_eq():
-    f = create_file_fragment(id=uuid4(), name="a test file")
-    f2 = create_file_fragment(id=uuid4(), name="a different test file")
+    f = fixtures.create_file_fragment(id=uuid4(), name="a test file")
+    f2 = fixtures.create_file_fragment(
+        id=uuid4(), name="a different test file"
+    )
     assert f == f
     assert f != f2
 
 
 def test_text_fragment_eq():
-    f = create_text_fragment(id=uuid4(), content="a test text")
-    f2 = create_text_fragment(id=uuid4(), content="a different test text")
+    f = fixtures.create_text_fragment(id=uuid4(), content="a test text")
+    f2 = fixtures.create_text_fragment(
+        id=uuid4(), content="a different test text"
+    )
     assert f == f
     assert f != f2
 
 
 def test_fragment_hash():
-    f = create_file_fragment(id=uuid4(), name="a test file")
-    f2 = create_file_fragment(id=uuid4(), name="a different test file")
+    f = fixtures.create_file_fragment(id=uuid4(), name="a test file")
+    f2 = fixtures.create_file_fragment(
+        id=uuid4(), name="a different test file"
+    )
     assert hash(f) == hash(f)
     assert hash(f) != hash(f2)
 
 
 def test_fragment_update_to_error_state():
-    f = create_file_fragment()
+    f = fixtures.create_file_fragment()
     f.set_upload_progress_error()
     assert f.status == FileFragmentStatus.ERROR
     assert f.upload_progress == 0

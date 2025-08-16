@@ -2,25 +2,13 @@ import logging
 from uuid import UUID
 
 from fastapi import HTTPException, Request
-from starlette.authentication import (
-    AuthCredentials,
-    AuthenticationBackend,
-    BaseUser,
-)
+from starlette.authentication import AuthCredentials, AuthenticationBackend
 from starlette.requests import HTTPConnection
 
 from api.service_manager import ServiceManager
+from entities.user import User
 
 logger = logging.getLogger(__name__)
-
-
-class User(BaseUser):
-    def __init__(self, user_id: str):
-        self.user_id = UUID(user_id)
-
-    @property
-    def is_authenticated(self) -> bool:
-        return True
 
 
 class AuthBackend(AuthenticationBackend):
@@ -41,7 +29,25 @@ class AuthBackend(AuthenticationBackend):
             return
         if res is None:
             return
-        return AuthCredentials(["authenticated"]), User(user_id=res.user.id)
+        try:
+            account = (
+                await sm.get_supabase_client()
+                .table("accounts")
+                .select("id")
+                .eq("owner", res.user.id)
+                .limit(1)
+                .single()
+                .execute()
+            )
+        except Exception as e:
+            logger.exception(e)
+            return
+        if not account.data or not account.data.get("id"):
+            # with no account, we cannot authorise the user and should fail
+            return None
+        return AuthCredentials(["authenticated"]), User(
+            id=UUID(res.user.id), account=UUID(account.data["id"])
+        )
 
 
 async def require_auth_dep(

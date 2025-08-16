@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from fragments.base import BaseFragment, FragmentType
+from .base import BaseFragment, FragmentType
 
 
 class FileFragmentStatus(Enum):
@@ -22,8 +22,8 @@ class File(BaseFragment):
     url: str | None = Field(default=None)
     type: FragmentType = Field(default=FragmentType.FILE, frozen=True)
 
-    def gen_key(self, user_id: UUID):
-        return f"{user_id}/{self.name}"
+    def gen_key(self, id: UUID):
+        return f"{id}/{self.name}"
 
     def __eq__(self, other: object):
         if not isinstance(other, File):

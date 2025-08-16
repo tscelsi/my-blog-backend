@@ -1,17 +1,17 @@
 import asyncio
-from test.fixtures import create_memory
 
+from entities.fragments.file import File, FileFragmentStatus
 from events.pubsub import LocalPublisher
 from events.storage_subscriber import StorageSubscriber
-from fragments.file import File, FileFragmentStatus
 from memory_repository import InMemoryMemoryRepository
+from test import fixtures
 from utils.file_storage.fake_storage import FakeStorage
 
 
 async def test_s3_subscriber_handle_upload_error(
     pub: LocalPublisher, ifilesys: FakeStorage
 ):
-    memory = create_memory()
+    memory = fixtures.create_memory()
     fragment = memory.fragments[0]
     assert isinstance(fragment, File)
     repo = InMemoryMemoryRepository(memories=[memory])
@@ -33,7 +33,7 @@ async def test_s3_subscriber_handle_upload_error(
 async def test_s3_subscriber_handle_upload_success(
     pub: LocalPublisher, ifilesys: FakeStorage
 ):
-    memory = create_memory()
+    memory = fixtures.create_memory()
     fragment = memory.fragments[0]
     assert isinstance(fragment, File)
     repo = InMemoryMemoryRepository(memories=[memory])

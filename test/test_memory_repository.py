@@ -3,13 +3,13 @@ from uuid import uuid4
 import pytest
 import supabase
 
-from memory import MemoryAlreadyExistsError
+from entities.memory import MemoryAlreadyExistsError
 from memory_repository import (
     InMemoryMemoryRepository,
     MemoryNotFoundError,
     SupabaseMemoryRepository,
 )
-from test.fixtures import create_memory
+from test import fixtures
 
 
 @pytest.fixture()
@@ -21,14 +21,14 @@ def memory_repo():
 
 class TestInMemoryRepository:
     async def test_create_memory(self, memory_repo: InMemoryMemoryRepository):
-        memory = create_memory()
+        memory = fixtures.create_memory()
         await memory_repo.create(memory=memory)
         with pytest.raises(MemoryAlreadyExistsError):
             await memory_repo.create(memory=memory)
         assert memory_repo.size == 1
 
     async def test_get_memory(self, memory_repo: InMemoryMemoryRepository):
-        memory = create_memory()
+        memory = fixtures.create_memory()
         await memory_repo.create(memory=memory)
         retrieved_memory = await memory_repo.authenticated_get(memory.id)
         assert memory.id == retrieved_memory.id
@@ -56,7 +56,7 @@ async def supabase_client():
 class TestSupabaseRepository:
     async def test_crud_memory(self, supabase_client: supabase.AsyncClient):
         repo = SupabaseMemoryRepository(supabase_client)
-        memory = create_memory()
+        memory = fixtures.create_memory()
         await repo.create(memory)
         res = await repo.authenticated_get(memory.id)
         assert res.id == memory.id
@@ -73,12 +73,12 @@ class TestSupabaseRepository:
         self, supabase_client: supabase.AsyncClient
     ):
         repo = SupabaseMemoryRepository(supabase_client)
-        memory = create_memory()
+        memory = fixtures.create_memory()
         await repo.delete(memory)  # noop
 
     async def test_update_non_existent_memory(
         self, supabase_client: supabase.AsyncClient
     ):
         repo = SupabaseMemoryRepository(supabase_client)
-        memory = create_memory()
+        memory = fixtures.create_memory()
         await repo.update(memory)

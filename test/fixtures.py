@@ -1,12 +1,14 @@
 from uuid import UUID
 
-from fragments.base import FragmentType
-from fragments.file import File
-from memory import Memory
+from entities.fragments.base import FragmentType
+from entities.fragments.file import File
+from entities.memory import Memory
+from entities.user import User
 
 MEMORY_ID = UUID("12345678-1234-5678-1234-567812345678")
 FRAGMENT_ID = UUID("12345678-1234-5678-1234-567812345679")
 USER_ID = UUID("12345678-1234-5678-1234-567812345678")
+ACCOUNT_ID = UUID("12345678-1234-5678-1234-567812345677")
 
 
 def create_file_fragment(
@@ -24,7 +26,12 @@ def create_text_fragment(
 def create_memory(fragment_name: str = "A Test File") -> Memory:
     return Memory(
         id=MEMORY_ID,
-        user_id=USER_ID,
+        owner=USER_ID,
         title="A Test Memory",
         fragments=[create_file_fragment(name=fragment_name)],
+        created_by=USER_ID,
     )
+
+
+def create_user():
+    return User(id=USER_ID, account=ACCOUNT_ID)

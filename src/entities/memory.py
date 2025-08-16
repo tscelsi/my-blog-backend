@@ -5,9 +5,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from fragments.file import File
-from fragments.rss import RSSFeed
-from fragments.text import RichText
+from entities.fragments.file import File
+from entities.fragments.rss import RSSFeed
+from entities.fragments.text import RichText
+from entities.user import User
 from tags import Tag
 from utils.logging_adapter import CustomLoggingAdapter
 from utils.mixins import AuditMixin
@@ -37,7 +38,6 @@ class Memory(AuditMixin, BaseModel):
     """A memory. Made up of fragments."""
 
     title: str
-    user_id: UUID
     fragments: list[File | RichText | RSSFeed] = Field(
         default_factory=lambda: []
     )
@@ -49,6 +49,15 @@ class Memory(AuditMixin, BaseModel):
     )
     tags: set[Tag] = Field(
         default_factory=lambda: set(), description="Tags for this memory."
+    )
+    owner: UUID = Field()
+    editors: set[UUID] = Field(
+        default_factory=lambda: set(),
+        description="Users allowed to edit this memory.",
+    )
+    readers: set[UUID] = Field(
+        default_factory=lambda: set(),
+        description="Users allowed to read this memory.",
     )
 
     def __init__(self, **kwargs: Any):
@@ -65,6 +74,30 @@ class Memory(AuditMixin, BaseModel):
         if not isinstance(other, Memory):
             return False
         return self.id == other.id
+
+    def cedar_schema(self) -> dict[str, Any]:
+        """Convert a Memory entity to a Cedar schema entity."""
+        return {
+            "uid": self.cedar_eid(),
+            "attrs": {
+                "editors": [
+                    {"__entity": User(id=editor).cedar_eid()}
+                    for editor in self.editors
+                ],
+                "readers": [
+                    {"__entity": User(id=reader).cedar_eid()}
+                    for reader in self.readers
+                ],
+                "owner": {"__entity": User(id=self.owner).cedar_eid()},
+            },
+            "parents": [],
+        }
+
+    def cedar_eid(self, as_str: bool = False) -> str | dict[str, str]:
+        """Convert the Memory entity to a Cedar EID."""
+        if as_str:
+            return f'{__class__.__name__}::"{self.id}"'
+        return {"id": str(self.id), "type": __class__.__name__}
 
     def get_fragment(self, fragment_id: UUID):
         for fragment in self.fragments:
@@ -97,7 +130,10 @@ class Memory(AuditMixin, BaseModel):
                 f"Memory {self.id} would have no fragments left after split"
             )
         new_memory = Memory(
-            title="_blank", user_id=self.user_id, fragments=fragments
+            title="_blank",
+            owner=self.owner,
+            created_by=self.owner,
+            fragments=fragments,
         )
         self.fragments = [f for f in self.fragments if f not in fragments]
         return self, new_memory

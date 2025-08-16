@@ -5,14 +5,23 @@ from uuid import UUID
 
 from supabase import AsyncClient, PostgrestAPIError
 
-from memory import Memory, MemoryAlreadyExistsError, MemoryNotFoundError
+from entities.memory import (
+    Memory,
+    MemoryAlreadyExistsError,
+    MemoryNotFoundError,
+)
+from entities.user import User
 
 logger = logging.getLogger(__name__)
 
 
 class AbstractMemoryRepository(abc.ABC):
     @abc.abstractmethod
-    async def create(self, memory: Memory) -> None:
+    async def create_empty(self, memory: Memory) -> None:
+        pass
+
+    @abc.abstractmethod
+    async def get(self, id: UUID) -> Memory:
         pass
 
     @abc.abstractmethod
@@ -26,6 +35,10 @@ class AbstractMemoryRepository(abc.ABC):
     @abc.abstractmethod
     async def delete(self, memory: Memory) -> None:
         """Delete a memory."""
+        pass
+
+    @abc.abstractmethod
+    async def list_all(self, user: User) -> list[Memory]:
         pass
 
     @abc.abstractmethod
@@ -66,12 +79,18 @@ class InMemoryMemoryRepository(AbstractMemoryRepository):
     def size(self):
         return len(self._memories)
 
-    async def create(self, memory: Memory) -> None:
+    async def create_empty(self, memory: Memory) -> None:
         if memory.id in [m.id for m in self._memories]:
             raise MemoryAlreadyExistsError(
                 f"Memory with id {memory.id} already exists"
             )
         self._memories.append(memory)
+
+    async def get(self, id: UUID) -> Memory:
+        for memory in self._memories:
+            if memory.id == id:
+                return memory
+        raise MemoryNotFoundError(f"Memory with id {id} not found")
 
     async def authenticated_get(self, id: UUID):
         for memory in self._memories:
@@ -87,6 +106,10 @@ class InMemoryMemoryRepository(AbstractMemoryRepository):
 
     async def authenticated_list_all(self) -> list[Memory]:
         return self._memories
+
+    async def list_all(self, user: User) -> list[Memory]:
+        """List all memories belonging to the user."""
+        return [m for m in self._memories if m.owner == user.id]
 
     async def public_list_all(self) -> list[Memory]:
         return [m for m in self._memories if not m.private]
@@ -117,6 +140,29 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
         self.client = client
         self.table = self.client.table("memories")
 
+    async def get(self, id: UUID) -> Memory:
+        """Get a memory by id."""
+        q = self.table.select("*").eq("id", str(id))
+        res = await q.execute()
+        if hasattr(res, "data") and res.data:
+            data = res.data[0]
+            return Memory(
+                id=data["id"],
+                owner=data["owner"],
+                readers=set(data["readers"]),
+                editors=set(data["editors"]),
+                title=data["title"],
+                fragments=data["fragments"],
+                private=data["private"],
+                pinned=data["pinned"],
+                tags=set(data["tags"]),
+                created_at=data["created_at"],
+                created_by=data["created_by"],
+                updated_at=data["updated_at"],
+                updated_by=data["updated_by"],
+            )
+        raise MemoryNotFoundError(f"Memory with id {id} not found")
+
     async def public_get(self, id: UUID) -> Memory:
         res = await self._get(id, authenticated=False)
         return res
@@ -125,13 +171,14 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
         res = await self._get(id, authenticated=True)
         return res
 
-    async def create(self, memory: Memory) -> None:
+    async def create_empty(self, memory: Memory) -> None:
         try:
             await self.table.insert(  # type: ignore
                 {
                     "id": str(memory.id),
                     "title": memory.title,
-                    "fragments": [f.serialise() for f in memory.fragments],
+                    "owner": str(memory.owner),
+                    "created_by": str(memory.created_by),
                 }
             ).execute()
         except PostgrestAPIError as e:
@@ -153,14 +200,18 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
             data = res.data[0]
             return Memory(
                 id=data["id"],
-                user_id=data["user_id"],
+                owner=data["owner"],
+                readers=set(data["readers"]),
+                editors=set(data["editors"]),
                 title=data["title"],
                 fragments=data["fragments"],
                 private=data["private"],
                 pinned=data["pinned"],
                 tags=set(data["tags"]),
                 created_at=data["created_at"],
+                created_by=data["created_by"],
                 updated_at=data["updated_at"],
+                updated_by=data["updated_by"],
             )
         raise MemoryNotFoundError(f"Memory with id {id} not found")
 
@@ -177,14 +228,18 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
             return [
                 Memory(
                     id=data["id"],
-                    user_id=data["user_id"],
+                    owner=data["owner"],
+                    readers=set(data["readers"]),
+                    editors=set(data["editors"]),
                     title=data["title"],
                     fragments=data["fragments"],
                     private=data["private"],
                     pinned=data["pinned"],
                     tags=data["tags"],
                     created_at=data["created_at"],
+                    created_by=data["created_by"],
                     updated_at=data["updated_at"],
+                    updated_by=data["updated_by"],
                 )
                 for data in res.data
             ]
@@ -197,6 +252,36 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
     async def authenticated_list_all(self) -> list[Memory]:
         res = await self._list(authenticated=True)
         return res
+
+    async def list_all(self, user: User) -> list[Memory]:
+        """List all memories belonging to the user."""
+        q = (
+            self.table.select("*")
+            .filter("owner", "eq", str(user.id))
+            .order("pinned", desc=True)
+            .order("created_at", desc=False)
+        )
+        res = await q.execute()
+        if hasattr(res, "data") and res.data:
+            return [
+                Memory(
+                    id=data["id"],
+                    owner=data["owner"],
+                    readers=set(data["readers"]),
+                    editors=set(data["editors"]),
+                    title=data["title"],
+                    fragments=data["fragments"],
+                    private=data["private"],
+                    pinned=data["pinned"],
+                    tags=data["tags"],
+                    created_at=data["created_at"],
+                    created_by=data["created_by"],
+                    updated_at=data["updated_at"],
+                    updated_by=data["updated_by"],
+                )
+                for data in res.data
+            ]
+        return []
 
     async def update(self, memory: Memory) -> None:
         await (
