@@ -22,14 +22,14 @@ def memory_repo():
 class TestInMemoryRepository:
     async def test_create_memory(self, memory_repo: InMemoryMemoryRepository):
         memory = fixtures.create_memory()
-        await memory_repo.create(memory=memory)
+        await memory_repo.create_empty(memory=memory)
         with pytest.raises(MemoryAlreadyExistsError):
-            await memory_repo.create(memory=memory)
+            await memory_repo.create_empty(memory=memory)
         assert memory_repo.size == 1
 
     async def test_get_memory(self, memory_repo: InMemoryMemoryRepository):
         memory = fixtures.create_memory()
-        await memory_repo.create(memory=memory)
+        await memory_repo.create_empty(memory=memory)
         retrieved_memory = await memory_repo.authenticated_get(memory.id)
         assert memory.id == retrieved_memory.id
 
@@ -57,12 +57,12 @@ class TestSupabaseRepository:
     async def test_crud_memory(self, supabase_client: supabase.AsyncClient):
         repo = SupabaseMemoryRepository(supabase_client)
         memory = fixtures.create_memory()
-        await repo.create(memory)
+        await repo.create_empty(memory)
         res = await repo.authenticated_get(memory.id)
         assert res.id == memory.id
         assert len(res.fragments) == 1
         with pytest.raises(MemoryAlreadyExistsError):
-            await repo.create(memory)
+            await repo.create_empty(memory)
         memory.fragments = []
         await repo.update(memory)
         res = await repo.authenticated_get(memory.id)
