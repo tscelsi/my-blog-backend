@@ -4,10 +4,9 @@ import supabase
 from pydantic_settings import BaseSettings
 from supabase import create_async_client
 
-from events.event_defs import StorageEvents
-from events.file_storage_event_handler import FileStorageEventHandler
-from events.pubsub import LocalPublisher
-from memory_repository import (
+from memories.events import StorageEvents
+from memories.file_storage_event_handler import FileStorageEventHandler
+from memories.memory_repository import (
     AbstractMemoryRepository,
     InMemoryMemoryRepository,
     SupabaseMemoryRepository,
@@ -20,6 +19,7 @@ from sharing.resource_repository import (
     CedarResourceRepository,
 )
 from utils.background_tasks import BackgroundTasks
+from utils.events.pubsub import LocalPublisher
 from utils.file_storage.fake_storage import FakeStorage
 from utils.file_storage.supabase_storage import SupabaseStorage
 

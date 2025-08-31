@@ -4,9 +4,8 @@ from pytest_httpx import HTTPXMock
 from entities.fragments.file import File
 from entities.fragments.rss import ListRssFeedError, RSSFeed
 from entities.user import User
-from events.pubsub import LocalPublisher
-from memory_repository import InMemoryMemoryRepository
-from memory_services import (
+from memories.memory_repository import InMemoryMemoryRepository
+from memories.services import (
     add_rss_feed_to_memory,
     create_empty_memory,
     pin_memory,
@@ -17,6 +16,7 @@ from memory_services import (
 from sharing.services import make_memory_private, make_memory_public
 from tags import Tag
 from test import fixtures
+from utils.events.pubsub import LocalPublisher
 from utils.file_storage.fake_storage import FakeStorage
 
 

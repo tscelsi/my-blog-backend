@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from events.pubsub import LocalPublisher, LocalSubscriber
+from utils.events.pubsub import LocalPublisher, LocalSubscriber
 
 from .events import PermissionsEvents
 from .permissions_manager import PermissionsManager

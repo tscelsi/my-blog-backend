@@ -9,13 +9,13 @@ from api.middleware.auth import require_auth_dep
 from api.service_manager import ServiceManager
 from entities.memory import BaseMemoryError, MemoryNotFoundError
 from entities.user import UserNotFoundError
-from memory_repository import (
+from memories.memory_repository import (
     AbstractMemoryRepository,
     SupabaseMemoryRepository,
 )
 from sharing.authorise import authorise
 from sharing.exceptions import AuthorisationError, BaseSharingError
-from user_repository import AbstractUserRepository, SupabaseUserRepository
+from sharing.user_repository import AbstractUserRepository, SupabaseUserRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(

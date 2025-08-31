@@ -1,11 +1,11 @@
 import asyncio
 
 from entities.fragments.file import File, FileFragmentStatus
-from events.event_defs import StorageEvents
-from events.pubsub import LocalPublisher
-from events.file_storage_event_handler import FileStorageEventHandler
-from memory_repository import InMemoryMemoryRepository
+from memories.events import StorageEvents
+from memories.file_storage_event_handler import FileStorageEventHandler
+from memories.memory_repository import InMemoryMemoryRepository
 from test import fixtures
+from utils.events.pubsub import LocalPublisher
 from utils.file_storage.fake_storage import FakeStorage
 
 

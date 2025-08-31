@@ -1,11 +1,11 @@
 from uuid import uuid4
 
-from events.pubsub import LocalPublisher
 from sharing.events import PermissionsEvents
 from sharing.permissions_event_handler import PermissionsEventHandler
 from sharing.permissions_manager import PermissionsManager
 from sharing.resource_repository import AbstractResourceRepository
 from test.fixtures import create_memory
+from utils.events.pubsub import LocalPublisher
 
 
 async def test_handle_skips_when_not_permission_event(

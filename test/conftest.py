@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 
-from events.pubsub import LocalPublisher, LocalSubscriber
-from memory_repository import InMemoryMemoryRepository
+from memories.memory_repository import InMemoryMemoryRepository
+from utils.events.pubsub import LocalPublisher, LocalSubscriber
 from utils.file_storage.fake_storage import FakeStorage
 
 logger = logging.getLogger(__name__)

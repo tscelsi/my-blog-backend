@@ -1,7 +1,6 @@
 from uuid import uuid4
 
-from events.pubsub import LocalPublisher
-from memory_repository import InMemoryMemoryRepository
+from memories.memory_repository import InMemoryMemoryRepository
 from sharing.events import PermissionsEvents
 from sharing.services import (
     add_editor,
@@ -9,8 +8,9 @@ from sharing.services import (
     remove_editor,
     remove_reader,
 )
+from sharing.user_repository import InMemoryUserRepository
 from test import fixtures
-from user_repository import InMemoryUserRepository
+from utils.events.pubsub import LocalPublisher
 
 
 async def test_add_editor_publishes(pub: LocalPublisher):

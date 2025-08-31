@@ -15,13 +15,13 @@ from fastapi import (
 )
 from pydantic import BaseModel
 
-import memory_services
+import memories.services as services
 from api.middleware.auth import require_auth_dep
 from api.service_manager import ServiceManager
 from entities.fragments.base import FragmentType
 from entities.fragments.rss import RssFeedError
 from entities.fragments.text import Op
-from memory_repository import (
+from memories.memory_repository import (
     AbstractMemoryRepository,
     SupabaseMemoryRepository,
 )
@@ -72,7 +72,7 @@ async def add_file_fragment_to_memory_endpoint(
         logger.error(f"Authorisation error: {e.detail}")
         raise HTTPException(status_code=403, detail=str(e))
     try:
-        fragment_id = await memory_services.add_file_fragment_to_memory(
+        fragment_id = await services.add_file_fragment_to_memory(
             memory_id,
             type,
             file.filename or "_blank",
@@ -111,7 +111,7 @@ async def add_rich_text_fragment_to_memory_endpoint(
         logger.error(f"Authorisation error: {e.detail}")
         raise HTTPException(status_code=403, detail=str(e))
     try:
-        fragment_id = await memory_services.add_rich_text_fragment_to_memory(
+        fragment_id = await services.add_rich_text_fragment_to_memory(
             memory_id, content, repo
         )
         return Response(fragment_id=fragment_id)
@@ -144,7 +144,7 @@ async def modify_rich_text_fragment_endpoint(
         logger.error(f"Authorisation error: {e.detail}")
         raise HTTPException(status_code=403, detail=str(e))
     try:
-        fragment_id = await memory_services.modify_rich_text_fragment(
+        fragment_id = await services.modify_rich_text_fragment(
             memory_id, fragment_id, content, repo
         )
         return Response(fragment_id=fragment_id)
@@ -176,7 +176,7 @@ async def add_rss_feed_fragment_to_memory_endpoint(
         logger.error(f"Authorisation error: {e.detail}")
         raise HTTPException(status_code=403, detail=str(e))
     try:
-        fragment_id = await memory_services.add_rss_feed_to_memory(
+        fragment_id = await services.add_rss_feed_to_memory(
             memory_id, urls, repo
         )
         return Response(fragment_id=fragment_id)
@@ -208,7 +208,7 @@ async def get_rss_feed_channel_endpoint(
         logger.error(f"Authorisation error: {e.detail}")
         raise HTTPException(status_code=403, detail=str(e))
     try:
-        items = await memory_services.get_rss_feed_items(
+        items = await services.get_rss_feed_items(
             memory_id, fragment_id, repo
         )
     except RssFeedError as e:
@@ -245,7 +245,7 @@ async def modify_rss_feed_fragment_endpoint(
         logger.error(f"Authorisation error: {e.detail}")
         raise HTTPException(status_code=403, detail=str(e))
     try:
-        fragment_id = await memory_services.modify_rss_feed_fragment(
+        fragment_id = await services.modify_rss_feed_fragment(
             memory_id, fragment_id, urls, repo, n_items=n_items
         )
         return Response(fragment_id=fragment_id)

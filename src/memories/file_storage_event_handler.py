@@ -1,10 +1,10 @@
 import logging
 from typing import Any
 
-import memory_services
-from events.event_defs import StorageEvents
-from events.pubsub import LocalPublisher, LocalSubscriber
-from memory_repository import AbstractMemoryRepository
+import memories.services as services
+from memories.events import StorageEvents
+from memories.memory_repository import AbstractMemoryRepository
+from utils.events.pubsub import LocalPublisher, LocalSubscriber
 from utils.file_storage.base_storage import AbstractFileStorage
 
 logger = logging.getLogger(__name__)
@@ -40,13 +40,13 @@ class FileStorageEventHandler(LocalSubscriber):
         if topic == StorageEvents.FILESYS_SAVE_ERROR:
             memory = event["memory"]
             fragment = event["fragment"]
-            await memory_services.save_file_fragment_upload_error(
+            await services.save_file_fragment_upload_error(
                 memory.id, fragment.id, self.repo
             )
         elif topic == StorageEvents.FILESYS_SAVE_SUCCESS:
             memory = event["memory"]
             fragment = event["fragment"]
-            await memory_services.save_file_fragment_upload_success(
+            await services.save_file_fragment_upload_success(
                 memory.id, fragment.id, self.repo, self.storage
             )
         elif topic == StorageEvents.FILESYS_DELETE_ERROR:

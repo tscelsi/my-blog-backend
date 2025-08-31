@@ -4,7 +4,7 @@ import pytest
 import supabase
 
 from entities.memory import MemoryAlreadyExistsError
-from memory_repository import (
+from memories.memory_repository import (
     InMemoryMemoryRepository,
     MemoryNotFoundError,
     SupabaseMemoryRepository,

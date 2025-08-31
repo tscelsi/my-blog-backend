@@ -1,10 +1,10 @@
 import logging
 from uuid import UUID
 
-from events.pubsub import LocalPublisher
-from memory_repository import AbstractMemoryRepository
+from memories.memory_repository import AbstractMemoryRepository
 from sharing.events import PermissionsEvents
-from user_repository import AbstractUserRepository
+from sharing.user_repository import AbstractUserRepository
+from utils.events.pubsub import LocalPublisher
 
 logger = logging.getLogger(__name__)
 

@@ -8,12 +8,12 @@ from entities.fragments.rss import RSSFeed
 from entities.fragments.text import Op, RichText
 from entities.memory import Memory
 from entities.user import User
-from events.event_defs import StorageEvents
+from memories.events import StorageEvents
+from memories.memory_repository import AbstractMemoryRepository
 from sharing.events import PermissionsEvents
-from events.pubsub import LocalPublisher
-from memory_repository import AbstractMemoryRepository
 from tags import Tag
 from utils.background_tasks import BackgroundTasks
+from utils.events.pubsub import LocalPublisher
 from utils.file_storage.base_storage import AbstractFileStorage
 from utils.rss_parser import RssItem
 
