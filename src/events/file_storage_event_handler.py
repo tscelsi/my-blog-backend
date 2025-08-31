@@ -1,7 +1,8 @@
 import logging
 from typing import Any
 
-import services
+import memory_services
+from events.event_defs import StorageEvents
 from events.pubsub import LocalPublisher, LocalSubscriber
 from memory_repository import AbstractMemoryRepository
 from utils.file_storage.base_storage import AbstractFileStorage
@@ -9,7 +10,7 @@ from utils.file_storage.base_storage import AbstractFileStorage
 logger = logging.getLogger(__name__)
 
 
-class StorageSubscriber(LocalSubscriber):
+class FileStorageEventHandler(LocalSubscriber):
     """A subscriber concerned with file manipulation events."""
 
     def __init__(
@@ -36,19 +37,19 @@ class StorageSubscriber(LocalSubscriber):
             `filesys_delete_success`: Logs a success message on delete.
         """
         topic = event["topic"]
-        if topic == "filesys_save_error":
+        if topic == StorageEvents.FILESYS_SAVE_ERROR:
             memory = event["memory"]
             fragment = event["fragment"]
-            await services.save_file_fragment_upload_error(
+            await memory_services.save_file_fragment_upload_error(
                 memory.id, fragment.id, self.repo
             )
-        elif topic == "filesys_save_success":
+        elif topic == StorageEvents.FILESYS_SAVE_SUCCESS:
             memory = event["memory"]
             fragment = event["fragment"]
-            await services.save_file_fragment_upload_success(
+            await memory_services.save_file_fragment_upload_success(
                 memory.id, fragment.id, self.repo, self.storage
             )
-        elif topic == "filesys_delete_error":
+        elif topic == StorageEvents.FILESYS_DELETE_ERROR:
             logger.error(f"Error deleting file: {event['key']}")
-        elif topic == "filesys_delete_success":
+        elif topic == StorageEvents.FILESYS_DELETE_SUCCESS:
             logger.info(f"Successfully deleted file: {event['key']}")

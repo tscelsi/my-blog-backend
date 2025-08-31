@@ -15,7 +15,7 @@ from fastapi import (
 )
 from pydantic import BaseModel
 
-import services
+import memory_services
 from api.middleware.auth import require_auth_dep
 from api.service_manager import ServiceManager
 from entities.fragments.base import FragmentType
@@ -25,6 +25,8 @@ from memory_repository import (
     AbstractMemoryRepository,
     SupabaseMemoryRepository,
 )
+from sharing.authorise import authorise
+from sharing.exceptions import AuthorisationError
 from utils.rss_parser import RssItem
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,11 @@ def get_memory_repository_dep(request: Request) -> AbstractMemoryRepository:
     return repo
 
 
+def get_service_manager_dep() -> ServiceManager:
+    """Dependency to get the service manager."""
+    return ServiceManager.get()
+
+
 class Response(BaseModel):
     fragment_id: UUID
 
@@ -51,12 +58,21 @@ async def add_file_fragment_to_memory_endpoint(
     memory_id: Annotated[UUID, Form()],
     type: Annotated[FragmentType, Form()],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+    service_manager: ServiceManager = Depends(get_service_manager_dep),
 ) -> Response:
     """Add a file Fragment to a Memory."""
-    service_manager = ServiceManager.get()
     try:
-        fragment_id = await services.add_file_fragment_to_memory(
+        authorise(
             request.user,
+            'Action::"CreateFragment"',
+            f'Memory::"{memory_id}"',
+            service_manager,
+        )
+    except AuthorisationError as e:
+        logger.error(f"Authorisation error: {e.detail}")
+        raise HTTPException(status_code=403, detail=str(e))
+    try:
+        fragment_id = await memory_services.add_file_fragment_to_memory(
             memory_id,
             type,
             file.filename or "_blank",
@@ -81,11 +97,22 @@ async def add_rich_text_fragment_to_memory_endpoint(
     content: Annotated[list[Op], Body()],
     memory_id: Annotated[UUID, Body()],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+    service_manager: ServiceManager = Depends(get_service_manager_dep),
 ) -> Response:
     """Add a rich text Fragment to a Memory."""
     try:
-        fragment_id = await services.add_rich_text_fragment_to_memory(
-            request.user, memory_id, content, repo
+        authorise(
+            request.user,
+            'Action::"CreateFragment"',
+            f'Memory::"{memory_id}"',
+            service_manager,
+        )
+    except AuthorisationError as e:
+        logger.error(f"Authorisation error: {e.detail}")
+        raise HTTPException(status_code=403, detail=str(e))
+    try:
+        fragment_id = await memory_services.add_rich_text_fragment_to_memory(
+            memory_id, content, repo
         )
         return Response(fragment_id=fragment_id)
     except Exception as e:
@@ -103,11 +130,22 @@ async def modify_rich_text_fragment_endpoint(
     memory_id: Annotated[UUID, Body()],
     fragment_id: Annotated[UUID, Body()],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+    service_manager: ServiceManager = Depends(get_service_manager_dep),
 ) -> Response:
     """Modify an existing rich text Fragment."""
     try:
-        fragment_id = await services.modify_rich_text_fragment(
-            request.user, memory_id, fragment_id, content, repo
+        authorise(
+            request.user,
+            'Action::"UpdateFragment"',
+            f'Memory::"{memory_id}"',
+            service_manager,
+        )
+    except AuthorisationError as e:
+        logger.error(f"Authorisation error: {e.detail}")
+        raise HTTPException(status_code=403, detail=str(e))
+    try:
+        fragment_id = await memory_services.modify_rich_text_fragment(
+            memory_id, fragment_id, content, repo
         )
         return Response(fragment_id=fragment_id)
     except Exception as e:
@@ -124,11 +162,22 @@ async def add_rss_feed_fragment_to_memory_endpoint(
     urls: Annotated[list[str], Body()],
     memory_id: Annotated[UUID, Body()],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+    service_manager: ServiceManager = Depends(get_service_manager_dep),
 ) -> Response:
     """Add an RSS feed Fragment to a Memory."""
     try:
-        fragment_id = await services.add_rss_feed_to_memory(
-            request.user, memory_id, urls, repo
+        authorise(
+            request.user,
+            'Action::"CreateFragment"',
+            f'Memory::"{memory_id}"',
+            service_manager,
+        )
+    except AuthorisationError as e:
+        logger.error(f"Authorisation error: {e.detail}")
+        raise HTTPException(status_code=403, detail=str(e))
+    try:
+        fragment_id = await memory_services.add_rss_feed_to_memory(
+            memory_id, urls, repo
         )
         return Response(fragment_id=fragment_id)
     except Exception as e:
@@ -145,11 +194,22 @@ async def get_rss_feed_channel_endpoint(
     memory_id: Annotated[UUID, Query()],
     fragment_id: Annotated[UUID, Query()],
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+    service_manager: ServiceManager = Depends(get_service_manager_dep),
 ) -> list[RssItem]:
     """List the stories from an RSS feed Fragment."""
     try:
-        items = await services.get_rss_feed_items(
-            request.user, memory_id, fragment_id, repo
+        authorise(
+            request.user,
+            'Action::"GetMemory"',
+            f'Memory::"{memory_id}"',
+            service_manager,
+        )
+    except AuthorisationError as e:
+        logger.error(f"Authorisation error: {e.detail}")
+        raise HTTPException(status_code=403, detail=str(e))
+    try:
+        items = await memory_services.get_rss_feed_items(
+            memory_id, fragment_id, repo
         )
     except RssFeedError as e:
         logger.exception(e)
@@ -171,11 +231,22 @@ async def modify_rss_feed_fragment_endpoint(
     fragment_id: Annotated[UUID, Body()],
     n_items: Annotated[int | None, Body()] = None,
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+    service_manager: ServiceManager = Depends(get_service_manager_dep),
 ) -> Response:
     """Add an RSS feed Fragment to a Memory."""
     try:
-        fragment_id = await services.modify_rss_feed_fragment(
-            request.user, memory_id, fragment_id, urls, repo, n_items=n_items
+        authorise(
+            request.user,
+            'Action::"UpdateFragment"',
+            f'Memory::"{memory_id}"',
+            service_manager,
+        )
+    except AuthorisationError as e:
+        logger.error(f"Authorisation error: {e.detail}")
+        raise HTTPException(status_code=403, detail=str(e))
+    try:
+        fragment_id = await memory_services.modify_rss_feed_fragment(
+            memory_id, fragment_id, urls, repo, n_items=n_items
         )
         return Response(fragment_id=fragment_id)
     except Exception as e:

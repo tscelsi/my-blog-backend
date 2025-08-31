@@ -78,25 +78,26 @@ class Memory(AuditMixin, BaseModel):
     def cedar_schema(self) -> dict[str, Any]:
         """Convert a Memory entity to a Cedar schema entity."""
         return {
-            "uid": self.cedar_eid(),
+            "uid": self.cedar_eid_json(),
             "attrs": {
                 "editors": [
-                    {"__entity": User(id=editor).cedar_eid()}
+                    {"__entity": User(id=editor).cedar_eid_json()}
                     for editor in self.editors
                 ],
                 "readers": [
-                    {"__entity": User(id=reader).cedar_eid()}
+                    {"__entity": User(id=reader).cedar_eid_json()}
                     for reader in self.readers
                 ],
-                "owner": {"__entity": User(id=self.owner).cedar_eid()},
+                "owner": {"__entity": User(id=self.owner).cedar_eid_json()},
             },
             "parents": [],
         }
 
-    def cedar_eid(self, as_str: bool = False) -> str | dict[str, str]:
+    def cedar_eid_str(self) -> str:
         """Convert the Memory entity to a Cedar EID."""
-        if as_str:
-            return f'{__class__.__name__}::"{self.id}"'
+        return f'{__class__.__name__}::"{self.id}"'
+
+    def cedar_eid_json(self) -> dict[str, str]:
         return {"id": str(self.id), "type": __class__.__name__}
 
     def get_fragment(self, fragment_id: UUID):
@@ -172,4 +173,40 @@ class Memory(AuditMixin, BaseModel):
     def set_tags(self, tags: set[Tag]):
         """Set new tags on the memory."""
         self.tags = tags
+        self.updated_at = datetime.now(tz=timezone.utc)
+
+    def add_editor(self, user_id: UUID):
+        """Add a user as an editor to this memory."""
+        self.add_editors({user_id})
+
+    def add_editors(self, user_ids: set[UUID]):
+        """Add multiple users as editors to this memory."""
+        self.editors.update(user_ids)
+        self.updated_at = datetime.now(tz=timezone.utc)
+
+    def add_reader(self, user_id: UUID):
+        """Add a user as a reader to this memory."""
+        self.add_readers({user_id})
+
+    def add_readers(self, user_ids: set[UUID]):
+        """Add multiple users as readers to this memory."""
+        self.readers.update(user_ids)
+        self.updated_at = datetime.now(tz=timezone.utc)
+
+    def remove_editor(self, user_id: UUID):
+        """Remove a user as an editor from this memory."""
+        self.remove_editors({user_id})
+
+    def remove_editors(self, user_ids: set[UUID]):
+        """Remove multiple users as editors from this memory."""
+        self.editors.difference_update(user_ids)
+        self.updated_at = datetime.now(tz=timezone.utc)
+
+    def remove_reader(self, user_id: UUID):
+        """Remove a user as a reader from this memory."""
+        self.remove_readers({user_id})
+
+    def remove_readers(self, user_ids: set[UUID]):
+        """Remove multiple users as readers from this memory."""
+        self.readers.difference_update(user_ids)
         self.updated_at = datetime.now(tz=timezone.utc)

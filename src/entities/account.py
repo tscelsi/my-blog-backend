@@ -14,13 +14,14 @@ class Account(BaseModel):
 
         https://docs.cedarpolicy.com/auth/entities-syntax.html"""
         return {
-            "uid": self.cedar_eid(),
+            "uid": self.cedar_eid_json(),
             "attrs": {},
             "parents": [],
         }
 
-    def cedar_eid(self, as_str: bool = False) -> str | dict[str, str]:
+    def cedar_eid_str(self) -> str:
         """Convert the Account entity to a Cedar EID."""
-        if as_str:
-            return f'{__class__.__name__}::"{self.id}"'
+        return f'{__class__.__name__}::"{self.id}"'
+
+    def cedar_eid_json(self) -> dict[str, str]:
         return {"id": str(self.id), "type": __class__.__name__}

@@ -70,6 +70,16 @@ class AbstractMemoryRepository(abc.ABC):
         """Update the tags of the memory."""
         pass
 
+    @abc.abstractmethod
+    async def update_readers(self, memory: Memory) -> None:
+        """Update the readers of the memory."""
+        pass
+
+    @abc.abstractmethod
+    async def update_editors(self, memory: Memory) -> None:
+        """Update the editors of the memory."""
+        pass
+
 
 class InMemoryMemoryRepository(AbstractMemoryRepository):
     def __init__(self, memories: list[Memory] = []):
@@ -132,6 +142,12 @@ class InMemoryMemoryRepository(AbstractMemoryRepository):
         pass
 
     async def update_tags(self, memory: Memory) -> None:
+        pass
+
+    async def update_readers(self, memory: Memory) -> None:
+        pass
+
+    async def update_editors(self, memory: Memory) -> None:
         pass
 
 
@@ -325,6 +341,30 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
             self.table.update(  # type: ignore
                 {
                     "tags": [tag.value for tag in memory.tags],
+                    "updated_at": memory.updated_at.isoformat(),
+                }
+            )
+            .eq("id", str(memory.id))
+            .execute()
+        )
+
+    async def update_editors(self, memory: Memory) -> None:
+        await (
+            self.table.update(  # type: ignore
+                {
+                    "editors": [str(editor) for editor in memory.editors],
+                    "updated_at": memory.updated_at.isoformat(),
+                }
+            )
+            .eq("id", str(memory.id))
+            .execute()
+        )
+
+    async def update_readers(self, memory: Memory) -> None:
+        await (
+            self.table.update(  # type: ignore
+                {
+                    "readers": [str(reader) for reader in memory.readers],
                     "updated_at": memory.updated_at.isoformat(),
                 }
             )

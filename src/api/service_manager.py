@@ -4,12 +4,20 @@ import supabase
 from pydantic_settings import BaseSettings
 from supabase import create_async_client
 
+from events.event_defs import StorageEvents
+from events.file_storage_event_handler import FileStorageEventHandler
 from events.pubsub import LocalPublisher
-from events.storage_subscriber import StorageSubscriber
 from memory_repository import (
     AbstractMemoryRepository,
     InMemoryMemoryRepository,
     SupabaseMemoryRepository,
+)
+from sharing.events import PermissionsEvents
+from sharing.permissions_event_handler import PermissionsEventHandler
+from sharing.permissions_manager import PermissionsManager
+from sharing.resource_repository import (
+    CedarResourceInMemoryRepository,
+    CedarResourceRepository,
 )
 from utils.background_tasks import BackgroundTasks
 from utils.file_storage.fake_storage import FakeStorage
@@ -79,14 +87,24 @@ class ServiceManager:
                 bucket="memories.develop", client=self.supabase_client
             )
         )
-        self.filesys_event_handler = StorageSubscriber(
+        self.filesys_event_handler = FileStorageEventHandler(
             self.pub, self.memory_repo, self.ifilesys
         )
-        self.filesys_event_handler.subscribe(
-            [
-                "filesys_save_error",
-                "filesys_save_success",
-                "filesys_delete_error",
-                "filesys_delete_success",
-            ]
+        self.filesys_event_handler.subscribe([x for x in StorageEvents])
+
+        # permissions setup #
+        self.permission_resource_repo = (
+            CedarResourceInMemoryRepository()
+            if self.stub
+            else CedarResourceRepository(self.supabase_client)
+        )
+        self.permissions_manager = PermissionsManager(
+            self.permission_resource_repo
+        )
+        await self.permissions_manager.init()
+        self.permissions_event_handler = PermissionsEventHandler(
+            self.pub, self.permissions_manager
+        )
+        self.permissions_event_handler.subscribe(
+            [x for x in PermissionsEvents]
         )
