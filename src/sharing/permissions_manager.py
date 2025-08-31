@@ -1,4 +1,3 @@
-from entities.memory import Memory
 from sharing.exceptions import ResourceNotFoundError
 from sharing.resource_repository import (
     AbstractResourceRepository,
@@ -17,7 +16,7 @@ class PermissionsManager:
             raise ResourceNotFoundError(f"Resource {cedar_eid} not found")
         return r
 
-    def update_resource(self, resource: Memory):
+    def update_resource(self, resource: CedarResource):
         self._resources[resource.cedar_eid_str()] = CedarResource(
             id=resource.id,
             owner=resource.owner,

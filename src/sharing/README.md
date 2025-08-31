@@ -1,13 +1,19 @@
-## resources
+# Sharing
+
+This bounded context is concerned with managing sharing permissions and by extension, authorisation of different actions using Cedar policies.
+
+## Cedar stuff
+
+### resources
 
 Fragment::<UUID>
 Memory::<UUID>
 
-## principals
+### principals
 
 User::<UUID>
 
-## actions
+### actions
 
 create, update, read, delete
 
@@ -39,17 +45,17 @@ readMemory - can read only when granted permissions or is the memory owner
 updateMemoryMetadata - can update only when granted permissions or is the memory owner
 deleteMemory - can delete only if is the user that created the memory
 
-## entities
+### entities
 
 User
-UserGroup
+Account
 Fragment
 Memory
 
 
-## demo policies
+### demo policies
 
-### when a memory is public, anyone can read it
+#### when a memory is public, anyone can read it
 
 permit(
     principal,
@@ -59,7 +65,7 @@ permit(
     resource.is_public
 };
 
-### can do anything when owner
+#### can do anything when owner
 
 permit(
     principal,
@@ -69,7 +75,7 @@ permit(
     principal == resource.created_by
 };
 
-### addFragment
+#### addFragment
 
 // can add fragment to memory when is the memory owner or has permissions
 permit(
@@ -78,7 +84,7 @@ permit(
     resource == Memory::<UUID>
 );
 
-### updateFragmentContent
+#### updateFragmentContent
 
 // can update fragment content when is the memory owner or has permissions
 permit(
@@ -87,7 +93,7 @@ permit(
     resource==Fragment::<UUID>
 );
 
-### deleteFragment
+#### deleteFragment
 
 permit(
     principal == User::<UUID>,
