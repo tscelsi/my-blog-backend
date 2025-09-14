@@ -289,7 +289,7 @@ async def forget_fragments(
     for fragment_id in fragment_ids:
         fragment = memory.get_fragment(fragment_id)
         if isinstance(fragment, File):
-            file_keys.append(fragment.gen_key(memory.owner))
+            file_keys.append(fragment.gen_key(memory.id))
         memory.forget_fragment(fragment_id)
     await memory_repo.update(memory)
     for key in file_keys:
@@ -316,7 +316,7 @@ async def forget_memory(
     file_keys: list[str] = []
     for fragment in memory.fragments:
         if isinstance(fragment, File):
-            file_keys.append(fragment.gen_key(memory.owner))
+            file_keys.append(fragment.gen_key(memory.id))
     await memory_repo.delete(memory)
     for key in file_keys:
         background_tasks.add(delete_file, key, ifilesys, pub)
@@ -381,7 +381,7 @@ async def save_file(
         `filesys_save_success`: Updates the FileFragment for success.
     """
     try:
-        key = fragment.gen_key(memory.owner)
+        key = fragment.gen_key(memory.id)
         await ifilesys.save(key, data)
     except Exception as e:
         logger.error(f"Error uploading fragment: {fragment}")
@@ -449,7 +449,7 @@ async def save_file_fragment_upload_success(
     if not isinstance(fragment, File):
         raise TypeError(f"Fragment {file_fragment_id} is not a FileFragment.")
     fragment.set_upload_succeeded()
-    key = fragment.gen_key(memory.owner)
+    key = fragment.gen_key(memory.id)
     url = await ifilesys.generate_presigned_url(key)
     fragment.url = url
     await repo.update(memory)

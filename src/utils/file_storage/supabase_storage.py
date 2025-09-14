@@ -21,7 +21,6 @@ class SupabaseStorage(AbstractFileStorage):
         )
 
     async def remove(self, key: str):
-        # Implement the logic to remove the file from Supabase bucket here
         await self.client.storage.from_(self.bucket).remove([key])  # type: ignore  # noqa
 
     async def generate_presigned_url(self, key: str) -> str:
