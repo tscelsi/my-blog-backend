@@ -24,6 +24,7 @@ async def test_add_editor_publishes(pub: LocalPublisher):
 
     # when
     await add_editor(
+        fixtures.create_user(),
         memory_id=fixtures.MEMORY_ID,
         user_email="editor@example.com",
         memory_repo=repo,
@@ -46,6 +47,7 @@ async def test_add_reader_publishes(pub: LocalPublisher):
     user_repo = InMemoryUserRepository({"reader@example.com": reader_id})
 
     await add_reader(
+        fixtures.create_user(),
         memory_id=fixtures.MEMORY_ID,
         user_email="reader@example.com",
         memory_repo=repo,

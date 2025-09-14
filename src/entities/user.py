@@ -1,6 +1,7 @@
 from typing import Any
 from uuid import UUID
 
+from pydantic import BaseModel
 from starlette.authentication import BaseUser
 
 from entities.account import Account
@@ -49,3 +50,8 @@ class User(BaseUser):
     @property
     def is_authenticated(self) -> bool:
         return True
+
+
+class UserWithEmail(BaseModel):
+    id: UUID
+    email: str

@@ -15,7 +15,10 @@ from memories.memory_repository import (
 )
 from sharing.authorise import authorise
 from sharing.exceptions import AuthorisationError, BaseSharingError
-from sharing.user_repository import AbstractUserRepository, SupabaseUserRepository
+from sharing.user_repository import (
+    AbstractUserRepository,
+    SupabaseUserRepository,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -36,18 +39,56 @@ def get_user_repository_dep(request: Request) -> AbstractUserRepository:
     return repo
 
 
+def get_admin_user_repository_dep() -> AbstractUserRepository:
+    """Dependency to get the request-specific memory repository."""
+    sm = ServiceManager.get()
+    assert sm.supabase_admin_client is not None
+    repo = SupabaseUserRepository(sm.supabase_admin_client)
+    return repo
+
+
 def get_service_manager_dep() -> ServiceManager:
     """Dependency to get the service manager."""
     return ServiceManager.get()
+
+
+@router.get("/{resource_id}/permissions", status_code=200)
+async def get_permissions(
+    request: Request,
+    resource_id: Annotated[UUID, Path()],
+    memory_repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+    user_repo: AbstractUserRepository = Depends(get_admin_user_repository_dep),
+    service_manager: ServiceManager = Depends(get_service_manager_dep),
+) -> services.MemoryPermissionData:
+    """Get a Memory's sharing permissions."""
+    try:
+        authorise(
+            request.user,
+            'Action::"GetSharingPermissions"',
+            f'Memory::"{resource_id}"',
+            service_manager,
+        )
+    except AuthorisationError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    try:
+        permissions = await services.get_permissions(
+            resource_id, memory_repo, user_repo
+        )
+        return permissions
+    except MemoryNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/{resource_id}/editors/add", status_code=204)
 async def add_editor(
     request: Request,
     resource_id: Annotated[UUID, Path()],
-    user_email: Annotated[str, Body(embed=True)],
+    email: Annotated[str, Body(embed=True)],
     memory_repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-    user_repo: AbstractUserRepository = Depends(get_user_repository_dep),
+    user_repo: AbstractUserRepository = Depends(get_admin_user_repository_dep),
     service_manager: ServiceManager = Depends(get_service_manager_dep),
 ):
     """Add a user to a Memory's edit permissions."""
@@ -62,13 +103,14 @@ async def add_editor(
         raise HTTPException(status_code=403, detail=str(e))
     try:
         await services.add_editor(
+            request.user,
             resource_id,
-            user_email,
+            email,
             memory_repo,
             user_repo,
             service_manager.pub,
         )
-    except (MemoryNotFoundError, UserNotFoundError) as e:
+    except (MemoryNotFoundError, UserNotFoundError, BaseSharingError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception(e)
@@ -95,7 +137,6 @@ async def remove_editor(
         raise HTTPException(status_code=403, detail=str(e))
     try:
         await services.remove_editor(
-            request.user,
             resource_id,
             user_id,
             memory_repo,
@@ -114,9 +155,9 @@ async def remove_editor(
 async def add_reader(
     request: Request,
     resource_id: Annotated[UUID, Path()],
-    user_email: Annotated[str, Body(embed=True)],
+    email: Annotated[str, Body(embed=True)],
     memory_repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
-    user_repo: AbstractUserRepository = Depends(get_user_repository_dep),
+    user_repo: AbstractUserRepository = Depends(get_admin_user_repository_dep),
     service_manager: ServiceManager = Depends(get_service_manager_dep),
 ):
     """Add a user to a Memory's read permissions."""
@@ -133,14 +174,14 @@ async def add_reader(
         await services.add_reader(
             request.user,
             resource_id,
-            user_email,
+            email,
             memory_repo,
             user_repo,
             service_manager.pub,
         )
     except AuthorisationError as e:
         raise HTTPException(status_code=403, detail=str(e))
-    except (MemoryNotFoundError, UserNotFoundError) as e:
+    except (MemoryNotFoundError, UserNotFoundError, BaseSharingError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception(e)
@@ -167,7 +208,6 @@ async def remove_reader(
         raise HTTPException(status_code=403, detail=str(e))
     try:
         await services.remove_reader(
-            request.user,
             resource_id,
             user_id,
             memory_repo,
@@ -203,11 +243,11 @@ async def set_public_private_endpoint(
     try:
         if is_public:
             await services.make_memory_public(
-                request.user, resource_id, repo, service_manager.pub
+                resource_id, repo, service_manager.pub
             )
         else:
-            await services.make_memory_public(
-                request.user, resource_id, repo, service_manager.pub
+            await services.make_memory_private(
+                resource_id, repo, service_manager.pub
             )
     except (BaseMemoryError, BaseSharingError) as e:
         logger.error(e)

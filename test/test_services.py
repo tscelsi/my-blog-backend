@@ -53,12 +53,12 @@ async def test_finalise_memory(user: User, pub: LocalPublisher):
         user, "test memory title", InMemoryMemoryRepository(), pub
     )
     await make_memory_public(memory_id, repo, pub)
-    memory = await repo.authenticated_get(memory_id)
+    memory = await repo.get(memory_id)
     old_updated_at = memory.updated_at
     assert memory.private is False
 
     await make_memory_private(memory_id, repo, pub)
-    memory = await repo.authenticated_get(memory_id)
+    memory = await repo.get(memory_id)
     new_updated_at = memory.updated_at
     assert memory.private is True
     assert new_updated_at > old_updated_at, (
@@ -71,16 +71,16 @@ async def test_pin_memory(user: User, pub: LocalPublisher):
     memory_id = await create_empty_memory(
         user, "test memory title", InMemoryMemoryRepository(), pub
     )
-    memory = await repo.authenticated_get(memory_id)
+    memory = await repo.get(memory_id)
     assert memory.pinned is False
 
     await pin_memory(memory_id, repo)
-    memory = await repo.authenticated_get(memory_id)
+    memory = await repo.get(memory_id)
     old_updated_at = memory.updated_at
     assert memory.pinned is True
 
     await unpin_memory(memory_id, repo)
-    memory = await repo.authenticated_get(memory_id)
+    memory = await repo.get(memory_id)
     new_updated_at = memory.updated_at
     assert memory.pinned is False
     assert new_updated_at > old_updated_at, (
@@ -96,7 +96,7 @@ async def test_set_tags(user: User, pub: LocalPublisher):
     tags = {Tag.music, Tag.software}
     await update_tags(memory_id, tags, repo)
 
-    updated_memory = await repo.authenticated_get(memory_id)
+    updated_memory = await repo.get(memory_id)
     assert updated_memory.tags == tags
 
 
@@ -111,7 +111,7 @@ async def test_get_rss_feed_channel_bad_req(
     fragment_id = await add_rss_feed_to_memory(
         memory_id, ["https://example.com/rss"], repo
     )
-    memory = await repo.authenticated_get(memory_id)
+    memory = await repo.get(memory_id)
     fragment = memory.get_fragment(fragment_id)
     assert isinstance(fragment, RSSFeed)
     with pytest.raises(ListRssFeedError):
@@ -129,7 +129,7 @@ async def test_get_rss_feed_channel(
     fragment_id = await add_rss_feed_to_memory(
         memory_id, ["https://example.com/rss"], repo
     )
-    memory = await repo.authenticated_get(memory_id)
+    memory = await repo.get(memory_id)
     fragment = memory.get_fragment(fragment_id)
     assert isinstance(fragment, RSSFeed)
     feed = await fragment.load_aggregated_feed()
@@ -142,7 +142,7 @@ async def test_create_memory_creates_permissions(
     repo = InMemoryMemoryRepository()
     memory_id = await create_empty_memory(user, "test", repo, pub)
     assert memory_id is not None
-    memory = await repo.authenticated_get(memory_id)
+    memory = await repo.get(memory_id)
     assert memory is not None
     assert memory.owner == user.id
     assert memory.readers == set()

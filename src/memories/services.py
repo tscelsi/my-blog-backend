@@ -71,7 +71,7 @@ async def get_memory(
     Returns:
         Memory: The Memory object.
     """
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     return memory
 
 
@@ -89,7 +89,7 @@ async def update_memory_title(
         title (str): The new title for the Memory.
         memory_repo (AbstractMemoryRepository): Repository of Memories.
     """
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     memory.title = title
     await memory_repo.update(memory)
     return memory.id
@@ -108,7 +108,7 @@ async def update_memory_fragment_ordering(
         fragment_ids (list[UUID]): The IDs of the fragments in the new order.
         memory_repo (AbstractMemoryRepository): Repository of Memories.
     """
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     memory.update_fragment_ordering(fragment_ids)
     await memory_repo.update(memory)
     return memory.id
@@ -141,7 +141,7 @@ async def add_file_fragment_to_memory(
         UUID: The ID of the updated Memory.
     """
     ff = FileFragmentFactory.create_file_fragment(filename, type=type)
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     memory.fragments.append(ff)
     await memory_repo.update(memory)
     background_tasks.add(save_file, ff, memory, file.read(), ifilesys, pub)
@@ -165,7 +165,7 @@ async def add_rich_text_fragment_to_memory(
         UUID: The ID of the updated Memory.
     """
     rtf = RichText.from_content(content=content)
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     memory.fragments.append(rtf)
     await memory_repo.update(memory)
     return rtf.id
@@ -188,7 +188,7 @@ async def add_rss_feed_to_memory(
         UUID: The ID of the updated Memory.
     """
     rssf = RSSFeed(urls=urls)
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     memory.fragments.append(rssf)
     await memory_repo.update(memory)
     return rssf.id
@@ -201,7 +201,7 @@ async def get_rss_feed_items(
 ) -> list[RssItem]:
     """Parse the RSS feed and return the news items, sorted by publication
     date."""
-    memory = await repo.authenticated_get(memory_id)
+    memory = await repo.get(memory_id)
     fragment = memory.get_fragment(fragment_id)
     if not isinstance(fragment, RSSFeed):
         raise TypeError(f"Fragment {fragment_id} is not an RSSFeed Fragment.")
@@ -228,7 +228,7 @@ async def modify_rss_feed_fragment(
     Returns:
         UUID: The ID of the updated Memory.
     """
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     fragment = memory.get_fragment(fragment_id)
     if not isinstance(fragment, RSSFeed):
         raise TypeError(f"Fragment {fragment_id} is not an RSSFeed Fragment.")
@@ -257,7 +257,7 @@ async def modify_rich_text_fragment(
     Returns:
         UUID: The ID of the updated Memory.
     """
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     fragment = memory.get_fragment(fragment_id)
     if not isinstance(fragment, RichText):
         raise TypeError(f"Fragment {fragment_id} is not a RichTextFragment.")
@@ -284,7 +284,7 @@ async def forget_fragments(
         background_tasks (BackgroundTasks): Background task runner.
         pub (LocalPublisher): Event publisher.
     """
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     file_keys: list[str] = []
     for fragment_id in fragment_ids:
         fragment = memory.get_fragment(fragment_id)
@@ -312,7 +312,7 @@ async def forget_memory(
         background_tasks (BackgroundTasks): Background task runner.
         pub (LocalPublisher): Event publisher.
     """
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     file_keys: list[str] = []
     for fragment in memory.fragments:
         if isinstance(fragment, File):
@@ -330,7 +330,7 @@ async def pin_memory(
     memory_repo: AbstractMemoryRepository,
 ):
     """Pin a memory."""
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     memory.pin()
     await memory_repo.update_pin_status(memory)
 
@@ -340,7 +340,7 @@ async def unpin_memory(
     memory_repo: AbstractMemoryRepository,
 ):
     """Unpin a memory."""
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     memory.unpin()
     await memory_repo.update_pin_status(memory)
 
@@ -351,7 +351,7 @@ async def update_tags(
     memory_repo: AbstractMemoryRepository,
 ):
     """Update the tags associated with a memory."""
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     memory.set_tags(tags)
     await memory_repo.update_tags(memory)
     await memory_repo.update_tags(memory)
@@ -444,7 +444,7 @@ async def save_file_fragment_upload_success(
         file_fragment_id (UUID): The ID of the file fragment.
         repo (AbstractMemoryRepository): Repository of Memories.
     """
-    memory = await repo.authenticated_get(memory_id)
+    memory = await repo.get(memory_id)
     fragment = memory.get_fragment(file_fragment_id)
     if not isinstance(fragment, File):
         raise TypeError(f"Fragment {file_fragment_id} is not a FileFragment.")
@@ -465,7 +465,7 @@ async def save_file_fragment_upload_error(
         file_fragment_id (UUID): The ID of the file fragment.
         repo (AbstractMemoryRepository): Repository of Memories.
     """
-    memory = await repo.authenticated_get(memory_id)
+    memory = await repo.get(memory_id)
     fragment = memory.get_fragment(file_fragment_id)
     if not isinstance(fragment, File):
         raise TypeError(f"Fragment {file_fragment_id} is not a FileFragment.")

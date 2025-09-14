@@ -22,6 +22,11 @@ action ListMemorySummaries appliesTo {  // not memory-specific so we use the Acc
     resource: Account
 };
 
+action GetSharingPermissions appliesTo {
+    principal: User,
+    resource: Memory
+};
+
 // edit actions
 
 action SharedMemoryEditActions, OwnerMemoryEditActions appliesTo {

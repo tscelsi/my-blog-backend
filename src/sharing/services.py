@@ -1,15 +1,58 @@
 import logging
 from uuid import UUID
 
+from pydantic import BaseModel
+
+from entities.user import User, UserWithEmail
 from memories.memory_repository import AbstractMemoryRepository
 from sharing.events import PermissionsEvents
+from sharing.exceptions import BaseSharingError
 from sharing.user_repository import AbstractUserRepository
 from utils.events.pubsub import LocalPublisher
 
 logger = logging.getLogger(__name__)
 
 
+class MemoryPermissionData(BaseModel):
+    id: UUID
+    owner: UUID
+    editors: list[UserWithEmail]
+    readers: list[UserWithEmail]
+    private: bool
+
+
+async def get_permissions(
+    memory_id: UUID,
+    memory_repo: AbstractMemoryRepository,
+    user_repo: AbstractUserRepository,
+):
+    memory = await memory_repo.get(memory_id)
+    editor_ids = memory.editors
+    reader_ids = memory.readers
+    user_ids = editor_ids.union(reader_ids)
+    if not user_ids:
+        return MemoryPermissionData(
+            id=memory.id,
+            owner=memory.owner,
+            editors=[],
+            readers=[],
+            private=memory.private,
+        )
+    # Fetch emails for editors and readers
+    res = await user_repo.get_user_emails_by_ids(editor_ids.union(reader_ids))
+    editors = [x for x in res if x.id in editor_ids]
+    readers = [x for x in res if x.id in reader_ids]
+    return MemoryPermissionData(
+        id=memory.id,
+        owner=memory.owner,
+        editors=editors,
+        readers=readers,
+        private=memory.private,
+    )
+
+
 async def add_editor(
+    principal: User,
     memory_id: UUID,
     user_email: str,
     memory_repo: AbstractMemoryRepository,
@@ -33,6 +76,8 @@ async def add_editor(
     """
     memory = await memory_repo.get(memory_id)
     user_id = await user_repo.get_user_id_by_email(user_email)
+    if user_id == principal.id:
+        raise BaseSharingError("Cannot add yourself as an editor")
     memory.add_editor(user_id)
     # Save the updated memory back to the repository
     await memory_repo.update_editors(memory)
@@ -40,6 +85,7 @@ async def add_editor(
 
 
 async def add_reader(
+    principal: User,
     memory_id: UUID,
     user_email: str,
     memory_repo: AbstractMemoryRepository,
@@ -66,6 +112,8 @@ async def add_reader(
     """
     memory = await memory_repo.get(memory_id)
     user_id = await user_repo.get_user_id_by_email(user_email)
+    if user_id == principal.id:
+        raise BaseSharingError("Cannot add yourself as a reader")
     memory.add_reader(user_id)
     # Save the updated memory back to the repository
     await memory_repo.update_readers(memory)
@@ -136,7 +184,7 @@ async def make_memory_public(
     pub: LocalPublisher,
 ):
     """Make a memory publicly readable."""
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     memory.make_public()
     await memory_repo.update_public_private(memory)
     pub.publish({"topic": PermissionsEvents.MADE_PUBLIC, "memory": memory})
@@ -149,7 +197,7 @@ async def make_memory_private(
 ):
     """Make a Memory only readable/editable by those it is shared with
     explicitly."""
-    memory = await memory_repo.authenticated_get(memory_id)
+    memory = await memory_repo.get(memory_id)
     memory.make_private()
     await memory_repo.update_public_private(memory)
     pub.publish({"topic": PermissionsEvents.MADE_PRIVATE, "memory": memory})

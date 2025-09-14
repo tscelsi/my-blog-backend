@@ -33,5 +33,5 @@ def create_memory(fragment_name: str = "A Test File") -> Memory:
     )
 
 
-def create_user():
-    return User(id=USER_ID, account=ACCOUNT_ID)
+def create_user(id: UUID = USER_ID) -> User:
+    return User(id=id, account=ACCOUNT_ID)

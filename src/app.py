@@ -10,6 +10,7 @@ from api.fragment_router import router as fragment_router
 from api.memory_router import router as memory_router
 from api.middleware.auth import AuthBackend
 from api.middleware.supabase_client import SupabaseClientMiddleware
+from api.public_router import router as public_router
 from api.service_manager import ServiceManager
 from api.sharing_router import router as sharing_router
 
@@ -44,6 +45,7 @@ app.add_middleware(SupabaseClientMiddleware)
 app.include_router(memory_router, tags=["memory_router"])
 app.include_router(fragment_router, tags=["fragment_router"])
 app.include_router(sharing_router, tags=["sharing_router"])
+app.include_router(public_router, tags=["public_router"])
 
 if __name__ == "__main__":
     import uvicorn

@@ -37,7 +37,7 @@ class ServiceManager:
     def __init__(self, stub: bool = False):
         self.stub = stub
         self.ifilesys = None
-        self.supabase_client = None
+        self.supabase_admin_client = None
         self.memory_repo = None
         self.filesys_event_handler = None
         self.background_tasks = BackgroundTasks()
@@ -60,9 +60,9 @@ class ServiceManager:
 
     def get_supabase_client(self) -> supabase.AsyncClient:
         """Get the Supabase client."""
-        if self.supabase_client is None:
+        if self.supabase_admin_client is None:
             raise ValueError("Supabase client not initialized.")
-        return self.supabase_client
+        return self.supabase_admin_client
 
     def get_filesys(self) -> FakeStorage | SupabaseStorage:
         """Get the file system storage."""
@@ -71,20 +71,20 @@ class ServiceManager:
         return self.ifilesys
 
     async def start(self):
-        self.supabase_client = await create_async_client(
+        self.supabase_admin_client = await create_async_client(
             supabase_url="https://tzppymbakxwelmkouucs.supabase.co",
             supabase_key=self.supabase_settings.SUPABASE_KEY,
         )
         self.memory_repo = (
             InMemoryMemoryRepository()
             if self.stub
-            else SupabaseMemoryRepository(self.supabase_client)
+            else SupabaseMemoryRepository(self.supabase_admin_client)
         )
         self.ifilesys = (
             FakeStorage(bucket="euw2.meapp.t0mm08669.develop")
             if self.stub
             else SupabaseStorage(
-                bucket="memories.develop", client=self.supabase_client
+                bucket="memories.develop", client=self.supabase_admin_client
             )
         )
         self.filesys_event_handler = FileStorageEventHandler(
@@ -96,7 +96,7 @@ class ServiceManager:
         self.permission_resource_repo = (
             CedarResourceInMemoryRepository()
             if self.stub
-            else CedarResourceRepository(self.supabase_client)
+            else CedarResourceRepository(self.supabase_admin_client)
         )
         self.permissions_manager = PermissionsManager(
             self.permission_resource_repo

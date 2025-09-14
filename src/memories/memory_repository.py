@@ -25,10 +25,6 @@ class AbstractMemoryRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
-    async def public_get(self, id: UUID) -> Memory:
-        pass
-
-    @abc.abstractmethod
     async def authenticated_get(self, id: UUID) -> Memory:
         pass
 
@@ -39,11 +35,6 @@ class AbstractMemoryRepository(abc.ABC):
 
     @abc.abstractmethod
     async def list_all(self, user: User) -> list[Memory]:
-        pass
-
-    @abc.abstractmethod
-    async def public_list_all(self) -> list[Memory]:
-        """List all memories."""
         pass
 
     @abc.abstractmethod
@@ -108,21 +99,12 @@ class InMemoryMemoryRepository(AbstractMemoryRepository):
                 return memory
         raise MemoryNotFoundError(f"Memory with id {id} not found")
 
-    async def public_get(self, id: UUID) -> Memory:
-        for memory in self._memories:
-            if memory.id == id and memory.private is False:
-                return memory
-        raise MemoryNotFoundError(f"Memory with id {id} not found")
-
     async def authenticated_list_all(self) -> list[Memory]:
         return self._memories
 
     async def list_all(self, user: User) -> list[Memory]:
         """List all memories belonging to the user."""
         return [m for m in self._memories if m.owner == user.id]
-
-    async def public_list_all(self) -> list[Memory]:
-        return [m for m in self._memories if not m.private]
 
     async def update(self, memory: Memory) -> None:
         # changed in-mem so all we do is check if mem exists.
@@ -178,10 +160,6 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
                 updated_by=data["updated_by"],
             )
         raise MemoryNotFoundError(f"Memory with id {id} not found")
-
-    async def public_get(self, id: UUID) -> Memory:
-        res = await self._get(id, authenticated=False)
-        return res
 
     async def authenticated_get(self, id: UUID) -> Memory:
         res = await self._get(id, authenticated=True)
@@ -260,10 +238,6 @@ class SupabaseMemoryRepository(AbstractMemoryRepository):
                 for data in res.data
             ]
         return []
-
-    async def public_list_all(self) -> list[Memory]:
-        res = await self._list(authenticated=False)
-        return res
 
     async def authenticated_list_all(self) -> list[Memory]:
         res = await self._list(authenticated=True)
