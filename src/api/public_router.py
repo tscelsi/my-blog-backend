@@ -26,14 +26,22 @@ def get_memory_repository_dep() -> AbstractMemoryRepository:
     return SupabaseMemoryRepository(sm.supabase_admin_client)
 
 
+def get_service_manager_dep() -> ServiceManager:
+    """Dependency to get the service manager."""
+    return ServiceManager.get()
+
+
 @router.get("/memory/{memory_id}", response_model=Memory, status_code=200)
 async def get_memory(
     memory_id: UUID,
     repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+    service_manager: ServiceManager = Depends(get_service_manager_dep),
 ) -> Memory:
     """Get a public memory."""
     try:
-        memory = await services.get_memory(memory_id, repo)
+        memory = await services.get_memory(
+            memory_id, repo, service_manager.get_filesys()
+        )
     except MemoryNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

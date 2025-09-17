@@ -1,7 +1,11 @@
+from datetime import datetime, timezone
 from enum import Enum
 from uuid import UUID
 
 from pydantic import Field
+
+from utils.file_storage.base_storage import AbstractFileStorage
+from utils.file_storage.supabase_storage import PRESIGNED_URL_EXPIRY_SECONDS
 
 from .base import BaseFragment, FragmentType
 
@@ -20,6 +24,7 @@ class File(BaseFragment):
     upload_progress: int = Field(default=0)
     status: FileFragmentStatus = Field(default=FileFragmentStatus.UPLOADING)
     url: str | None = Field(default=None)
+    url_last_generated: datetime | None = Field(default=None)
     type: FragmentType = Field(default=FragmentType.FILE, frozen=True)
 
     def gen_key(self, id: UUID):
@@ -49,6 +54,24 @@ class File(BaseFragment):
     def set_upload_succeeded(self):
         self.status = FileFragmentStatus.UPLOADED
         self.upload_progress = 100
+
+    async def check_presigned_url(
+        self, id: UUID, ifilesys: AbstractFileStorage
+    ):
+        """Checks if the presigned URL to access the resource needs to be
+        regenerated, and does so if necessary."""
+        if self.url_last_generated is not None:
+            delta = datetime.now(tz=timezone.utc) - self.url_last_generated
+            if delta.total_seconds() < PRESIGNED_URL_EXPIRY_SECONDS:
+                return  # don't regen if less than an hour old
+        key = self.gen_key(id)
+        old_last_generated = self.url_last_generated
+        self.url_last_generated = datetime.now(tz=timezone.utc)
+        try:
+            self.url = await ifilesys.generate_presigned_url(key)
+        except Exception:
+            self.url = None
+            self.url_last_generated = old_last_generated
 
 
 class Audio(File):

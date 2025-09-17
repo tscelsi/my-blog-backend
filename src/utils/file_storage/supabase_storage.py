@@ -3,6 +3,8 @@ import supabase
 from utils.file_storage.base_storage import AbstractFileStorage
 from utils.file_storage.exceptions import DataTypeError, FileTooBigError
 
+PRESIGNED_URL_EXPIRY_SECONDS = 60 * 60  # 1 hour
+
 
 class SupabaseStorage(AbstractFileStorage):
     def __init__(self, bucket: str, client: supabase.AsyncClient):
@@ -26,8 +28,6 @@ class SupabaseStorage(AbstractFileStorage):
     async def generate_presigned_url(self, key: str) -> str:
         # Generate a presigned URL for the file in Supabase bucket
         res = await self.client.storage.from_(self.bucket).create_signed_url(
-            key,
-            60 * 60 * 24,  # 1 day expiration
-            {"download": True},
+            key, PRESIGNED_URL_EXPIRY_SECONDS, {"transform": {"quality": 20}}
         )
         return res["signedUrl"]

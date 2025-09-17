@@ -1,5 +1,6 @@
+import asyncio
 import logging
-from typing import BinaryIO
+from typing import Any, BinaryIO, Coroutine
 from uuid import UUID
 
 from entities.fragments.base import FragmentType
@@ -60,18 +61,26 @@ async def list_memories(
 async def get_memory(
     memory_id: UUID,
     memory_repo: AbstractMemoryRepository,
+    ifilesys: AbstractFileStorage,
 ) -> Memory:
     """Get a Memory by its ID.
 
     Args:
-        user (User): The authenticated user.
         memory_id (UUID): The ID of the Memory to retrieve.
         memory_repo (AbstractMemoryRepository): Repository of Memories.
-
+        ifilesys (AbstractFileStorage): The file system interface.
     Returns:
         Memory: The Memory object.
     """
     memory = await memory_repo.get(memory_id)
+    # check file presigned URLs are still valid, and regenerate if not
+    jobs: list[Coroutine[Any, Any, None]] = []
+    for fragment in memory.fragments:
+        if isinstance(fragment, File):
+            jobs.append(fragment.check_presigned_url(memory.id, ifilesys))
+    if jobs:
+        await asyncio.gather(*jobs, return_exceptions=True)
+        await memory_repo.update(memory)
     return memory
 
 

@@ -111,7 +111,9 @@ async def get_memory(
         logger.error(f"Authorisation error: {e.detail}")
         raise HTTPException(status_code=403, detail=str(e))
     try:
-        memory = await services.get_memory(memory_id, repo)
+        memory = await services.get_memory(
+            memory_id, repo, service_manager.get_filesys()
+        )
     except MemoryNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
