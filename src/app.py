@@ -6,6 +6,7 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from api.auth_router import router as auth_router
 from api.fragment_router import router as fragment_router
 from api.memory_router import router as memory_router
 from api.middleware.auth import AuthBackend
@@ -19,7 +20,7 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    service_manager = ServiceManager.get(stub=False)
+    service_manager = ServiceManager.get()
     await service_manager.start()
     yield
 
@@ -46,6 +47,7 @@ app.include_router(memory_router, tags=["memory_router"])
 app.include_router(fragment_router, tags=["fragment_router"])
 app.include_router(sharing_router, tags=["sharing_router"])
 app.include_router(public_router, tags=["public_router"])
+app.include_router(auth_router, tags=["auth_router"])
 
 if __name__ == "__main__":
     import uvicorn

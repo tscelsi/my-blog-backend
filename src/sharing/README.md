@@ -2,6 +2,18 @@
 
 This bounded context is concerned with managing sharing permissions and by extension, authorisation of different actions using Cedar policies.
 
+## Ubiquitous language
+1. A memory has an owner.
+2. A memory has a set of editors (other users) that is managed by the owner.
+3. A memory has a set of readers (other users) that is managed by the owner.
+4. A memory can be in two states: public or private.
+5. If a memory is private, then the owner, and any user that is an editor can modify its fragments.
+6. If a memory is private, then the owner and any user that is an editor or reader can read its fragments.
+7. If a memory is public, anyone can read its fragments by navigating to its public url.
+8. The url of public memories should be indexable by search engines.
+9. Private memories should not be indexed by search engines.
+
+
 ## Cedar stuff
 
 ### resources

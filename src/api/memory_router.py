@@ -6,7 +6,12 @@ from uuid import UUID
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from pydantic import BaseModel
 
-import memories.services as services
+import account_management.services as account_services
+import memories.services as memory_services
+from account_management.account_repository import (
+    AbstractAccountRepository,
+    SupabaseAccountRepository,
+)
 from api.middleware.auth import require_auth_dep
 from api.service_manager import ServiceManager
 from entities.memory import (
@@ -15,13 +20,14 @@ from entities.memory import (
     MemoryAlreadyExistsError,
     MemoryNotFoundError,
 )
+from entities.user import BaseAccountError
 from memories.memory_repository import (
     AbstractMemoryRepository,
     SupabaseMemoryRepository,
 )
-from sharing.authorise import authorise
 from sharing.exceptions import AuthorisationError
 from tags import Tag
+from utils.authorise import authorise
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -33,6 +39,12 @@ router = APIRouter(
 def get_memory_repository_dep(request: Request) -> AbstractMemoryRepository:
     """Dependency to get the request-specific memory repository."""
     repo = SupabaseMemoryRepository(request.state.supabase_client)
+    return repo
+
+
+def get_account_repository_dep(request: Request) -> AbstractAccountRepository:
+    """Dependency to get the request-specific memory repository."""
+    repo = SupabaseAccountRepository(request.state.supabase_client)
     return repo
 
 
@@ -54,7 +66,7 @@ async def create_empty_memory(
 ) -> CreateMemoryResponse:
     """Create an empty memory."""
     try:
-        new_memory_id = await services.create_empty_memory(
+        new_memory_id = await memory_services.create_empty_memory(
             request.user, memory_title, repo, service_manager.pub
         )
     except MemoryAlreadyExistsError:
@@ -82,7 +94,7 @@ async def list_user_memories(
 ):
     """List a user's memories."""
     try:
-        memories = await services.list_memories(repo)
+        memories = await memory_services.list_memories(repo)
     except Exception as e:
         logger.exception(e)
         raise HTTPException(
@@ -111,8 +123,8 @@ async def get_memory(
         logger.error(f"Authorisation error: {e.detail}")
         raise HTTPException(status_code=403, detail=str(e))
     try:
-        memory = await services.get_memory(
-            memory_id, repo, service_manager.get_filesys()
+        memory = await memory_services.get_memory(
+            memory_id, repo, service_manager.get_storage()
         )
     except MemoryNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -143,9 +155,9 @@ async def forget_memory(
             except AuthorisationError as e:
                 logger.error(f"Authorisation error: {e.detail}")
                 raise HTTPException(status_code=403, detail=str(e))
-            await services.forget_memory(
+            await memory_services.forget_memory(
                 memory_id,
-                service_manager.get_filesys(),
+                service_manager.get_storage(),
                 repo,
                 service_manager.background_tasks,
                 service_manager.pub,
@@ -161,10 +173,10 @@ async def forget_memory(
             except AuthorisationError as e:
                 logger.error(f"Authorisation error: {e.detail}")
                 raise HTTPException(status_code=403, detail=str(e))
-            await services.forget_fragments(
+            await memory_services.forget_fragments(
                 memory_id,
                 fragment_ids,
-                service_manager.get_filesys(),
+                service_manager.get_storage(),
                 repo,
                 service_manager.background_tasks,
                 service_manager.pub,
@@ -183,14 +195,16 @@ async def pin_memory(
     request: Request,
     memory_id: Annotated[UUID, Path()],
     pin: Annotated[bool, Body(embed=True)],
-    repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+    account_repo: AbstractAccountRepository = Depends(
+        get_account_repository_dep
+    ),
     service_manager: ServiceManager = Depends(get_service_manager_dep),
 ):
     """Pin or unpin a memory."""
     try:
-        authorise(
+        authorise(  # check user has at least read-access
             request.user,
-            'Action::"EditPin"',
+            'Action::"GetMemory"',
             f'Memory::"{memory_id}"',
             service_manager,
         )
@@ -199,10 +213,14 @@ async def pin_memory(
         raise HTTPException(status_code=403, detail=str(e))
     try:
         if pin:
-            await services.pin_memory(memory_id, repo)
+            await account_services.pin_memory(
+                request.user, memory_id, account_repo
+            )
         else:
-            await services.unpin_memory(memory_id, repo)
-    except BaseMemoryError as e:
+            await account_services.unpin_memory(
+                request.user, memory_id, account_repo
+            )
+    except BaseAccountError as e:
         logger.error(e)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -231,7 +249,7 @@ async def tag_memory(
         logger.error(f"Authorisation error: {e.detail}")
         raise HTTPException(status_code=403, detail=str(e))
     try:
-        await services.update_tags(memory_id, tags, repo)
+        await memory_services.update_tags(memory_id, tags, repo)
     except BaseMemoryError as e:
         logger.error(e)
         raise HTTPException(status_code=400, detail=str(e))
@@ -261,7 +279,7 @@ async def set_fragment_ordering(
         logger.error(f"Authorisation error: {e.detail}")
         raise HTTPException(status_code=403, detail=str(e))
     try:
-        await services.update_memory_fragment_ordering(
+        await memory_services.update_memory_fragment_ordering(
             memory_id, fragment_ids, repo
         )
     except BaseMemoryError as e:
@@ -295,7 +313,7 @@ async def set_memory_title(
         logger.error(f"Authorisation error: {e.detail}")
         raise HTTPException(status_code=403, detail=str(e))
     try:
-        await services.update_memory_title(
+        await memory_services.update_memory_title(
             request.user, memory_id, memory_title, repo
         )
     except BaseMemoryError as e:

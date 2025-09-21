@@ -1,10 +1,12 @@
-from typing import Any
+import logging
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.authentication import BaseUser
 
-from entities.account import Account
+from utils.mixins import AuditMixin
+
+logger = logging.getLogger(__name__)
 
 
 class BaseUserError(Exception):
@@ -24,29 +26,6 @@ class User(BaseUser):
         self.id = id
         self.account = account
 
-    def cedar_schema(self) -> dict[str, Any]:
-        """Convert the User entity to a Cedar entity syntax.
-
-        https://docs.cedarpolicy.com/auth/entities-syntax.html"""
-        return {
-            "uid": {"id": str(self.id), "type": __class__.__name__},
-            "attrs": {
-                "account": {
-                    "__entity": Account(id=self.account).cedar_eid_json()
-                }
-            }
-            if self.account
-            else {},
-            "parents": [],
-        }
-
-    def cedar_eid_str(self) -> str:
-        """Convert the User entity to a Cedar EID."""
-        return f'{__class__.__name__}::"{self.id}"'
-
-    def cedar_eid_json(self) -> dict[str, str]:
-        return {"id": str(self.id), "type": __class__.__name__}
-
     @property
     def is_authenticated(self) -> bool:
         return True
@@ -55,3 +34,27 @@ class User(BaseUser):
 class UserWithEmail(BaseModel):
     id: UUID
     email: str
+
+
+class BaseAccountError(Exception):
+    pass
+
+
+class AccountNotFoundError(BaseAccountError):
+    pass
+
+
+class Account(AuditMixin, BaseModel):
+    """Account entity representing a user account."""
+
+    owner: UUID
+    memories_pinned: set[UUID] = Field(default=set())
+
+    def pin_memory(self, memory_id: UUID):
+        self.memories_pinned.add(memory_id)
+
+    def unpin_memory(self, memory_id: UUID):
+        try:
+            self.memories_pinned.remove(memory_id)
+        except KeyError as e:
+            logger.warning(e)

@@ -5,6 +5,10 @@ from uuid import UUID
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 
 import sharing.services as services
+from account_management.account_repository import (
+    AbstractAccountRepository,
+    SupabaseAccountRepository,
+)
 from api.middleware.auth import require_auth_dep
 from api.service_manager import ServiceManager
 from entities.memory import BaseMemoryError, MemoryNotFoundError
@@ -13,12 +17,12 @@ from memories.memory_repository import (
     AbstractMemoryRepository,
     SupabaseMemoryRepository,
 )
-from sharing.authorise import authorise
 from sharing.exceptions import AuthorisationError, BaseSharingError
 from sharing.user_repository import (
     AbstractUserRepository,
     SupabaseUserRepository,
 )
+from utils.authorise import authorise
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -30,6 +34,12 @@ router = APIRouter(
 def get_memory_repository_dep(request: Request) -> AbstractMemoryRepository:
     """Dependency to get the request-specific memory repository."""
     repo = SupabaseMemoryRepository(request.state.supabase_client)
+    return repo
+
+
+def get_account_repository_dep(request: Request) -> AbstractAccountRepository:
+    """Dependency to get the request-specific account repository."""
+    repo = SupabaseAccountRepository(request.state.supabase_client)
     return repo
 
 
@@ -123,6 +133,9 @@ async def remove_editor(
     resource_id: Annotated[UUID, Path()],
     user_id: Annotated[UUID, Body(embed=True)],
     memory_repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+    account_repo: AbstractAccountRepository = Depends(
+        get_account_repository_dep
+    ),
     service_manager: ServiceManager = Depends(get_service_manager_dep),
 ):
     """Remove a user from a Memory's edit permissions."""
@@ -140,6 +153,7 @@ async def remove_editor(
             resource_id,
             user_id,
             memory_repo,
+            account_repo,
             service_manager.pub,
         )
     except AuthorisationError as e:
@@ -194,6 +208,9 @@ async def remove_reader(
     resource_id: Annotated[UUID, Path()],
     user_id: Annotated[UUID, Body(embed=True)],
     memory_repo: AbstractMemoryRepository = Depends(get_memory_repository_dep),
+    account_repo: AbstractAccountRepository = Depends(
+        get_account_repository_dep
+    ),
     service_manager: ServiceManager = Depends(get_service_manager_dep),
 ):
     """Remove a user from a Memory's read permissions."""
@@ -211,6 +228,7 @@ async def remove_reader(
             resource_id,
             user_id,
             memory_repo,
+            account_repo,
             service_manager.pub,
         )
     except AuthorisationError as e:

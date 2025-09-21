@@ -1,5 +1,6 @@
 from uuid import uuid4
 
+from account_management.account_repository import InMemoryAccountRepository
 from memories.memory_repository import InMemoryMemoryRepository
 from sharing.events import PermissionsEvents
 from sharing.services import (
@@ -62,38 +63,50 @@ async def test_add_reader_publishes(pub: LocalPublisher):
 
 
 async def test_remove_editor_publishes(pub: LocalPublisher):
-    editor_id = uuid4()
-    memory = fixtures.create_memory()
-    memory.add_editor(editor_id)
-    repo = InMemoryMemoryRepository([memory])
+    user = fixtures.create_user()
+    user_acc = fixtures.create_account_with_user(user)
+    editor = fixtures.create_user(id=uuid4(), account_id=uuid4())
+    editor_acc = fixtures.create_account_with_user(editor)
+    memory = fixtures.create_memory_with_user(user)
+    memory.add_editor(editor.id)
+    editor_acc.pin_memory(memory.id)
+    memory_repo = InMemoryMemoryRepository([memory])
+    account_repo = InMemoryAccountRepository([user_acc, editor_acc])
 
     await remove_editor(
         memory_id=fixtures.MEMORY_ID,
-        user_id=editor_id,
-        memory_repo=repo,
+        user_id=editor.id,
+        memory_repo=memory_repo,
+        account_repo=account_repo,
         pub=pub,
     )
 
-    updated = await repo.get(fixtures.MEMORY_ID)
-    assert editor_id not in updated.editors
+    updated = await account_repo.get_by_user_id(editor.id)
+    assert editor.id not in updated.memories_pinned
     topic = pub._latest_event["topic"]  # type: ignore  # noqa
     assert topic == PermissionsEvents.EDITORS_REMOVED
 
 
 async def test_remove_reader_publishes(pub: LocalPublisher):
-    reader_id = uuid4()
-    memory = fixtures.create_memory()
-    memory.add_reader(reader_id)
-    repo = InMemoryMemoryRepository([memory])
+    user = fixtures.create_user()
+    user_acc = fixtures.create_account_with_user(user)
+    reader = fixtures.create_user(id=uuid4(), account_id=uuid4())
+    reader_acc = fixtures.create_account_with_user(reader)
+    memory = fixtures.create_memory_with_user(user)
+    memory.add_reader(reader.id)
+    reader_acc.pin_memory(memory.id)
+    memory_repo = InMemoryMemoryRepository([memory])
+    account_repo = InMemoryAccountRepository([user_acc, reader_acc])
 
     await remove_reader(
         memory_id=fixtures.MEMORY_ID,
-        user_id=reader_id,
-        memory_repo=repo,
+        user_id=reader.id,
+        memory_repo=memory_repo,
+        account_repo=account_repo,
         pub=pub,
     )
 
-    updated = await repo.get(fixtures.MEMORY_ID)
-    assert reader_id not in updated.readers
+    updated = await account_repo.get_by_user_id(reader.id)
+    assert reader.id not in updated.memories_pinned
     topic = pub._latest_event["topic"]  # type: ignore  # noqa
     assert topic == PermissionsEvents.READERS_REMOVED

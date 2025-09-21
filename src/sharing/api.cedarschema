@@ -44,6 +44,11 @@ action UpdateMemoryTitle, UpdateFragmentOrder, CreateFragment, UpdateFragment, D
     resource: Memory
 };
 
+action EditPinInAccount appliesTo {
+    principal: User,
+    resource: Account
+};
+
 action CreateMemory appliesTo {
     principal: User,
     resource: Account

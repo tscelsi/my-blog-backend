@@ -1,8 +1,10 @@
+import asyncio
 import logging
 from uuid import UUID
 
 from pydantic import BaseModel
 
+from account_management.account_repository import AbstractAccountRepository
 from entities.user import User, UserWithEmail
 from memories.memory_repository import AbstractMemoryRepository
 from sharing.events import PermissionsEvents
@@ -124,6 +126,7 @@ async def remove_editor(
     memory_id: UUID,
     user_id: UUID,
     memory_repo: AbstractMemoryRepository,
+    account_repo: AbstractAccountRepository,
     pub: LocalPublisher,
 ):
     """Add a user as an editor to a memory.
@@ -142,10 +145,15 @@ async def remove_editor(
         MemoryNotFoundError: If the memory with the given ID does not exist.
         UserNotFoundError: If the user with the given email does not exist.
     """
-    memory = await memory_repo.get(memory_id)
+    memory, account = await asyncio.gather(
+        memory_repo.get(memory_id), account_repo.get_by_user_id(user_id)
+    )
     memory.remove_editor(user_id)
-    # Save the updated memory back to the repository
-    await memory_repo.update_editors(memory)
+    account.unpin_memory(memory_id)
+    # Persist the updated memory and account
+    await asyncio.gather(
+        memory_repo.update_editors(memory), account_repo.update(account)
+    )
     pub.publish({"topic": PermissionsEvents.EDITORS_REMOVED, "memory": memory})
 
 
@@ -153,6 +161,7 @@ async def remove_reader(
     memory_id: UUID,
     user_id: UUID,
     memory_repo: AbstractMemoryRepository,
+    account_repo: AbstractAccountRepository,
     pub: LocalPublisher,
 ):
     """Remove a user as an reader to a memory.
@@ -171,10 +180,15 @@ async def remove_reader(
         MemoryNotFoundError: If the memory with the given ID does not exist.
         UserNotFoundError: If the user with the given email does not exist.
     """
-    memory = await memory_repo.get(memory_id)
+    memory, account = await asyncio.gather(
+        memory_repo.get(memory_id), account_repo.get_by_user_id(user_id)
+    )
     memory.remove_reader(user_id)
-    # Save the updated memory back to the repository
-    await memory_repo.update_readers(memory)
+    account.unpin_memory(memory_id)
+    # Persist the updated memory and account
+    await asyncio.gather(
+        memory_repo.update_readers(memory), account_repo.update(account)
+    )
     pub.publish({"topic": PermissionsEvents.READERS_REMOVED, "memory": memory})
 
 

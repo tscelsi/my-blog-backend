@@ -40,7 +40,7 @@ async def get_memory(
     """Get a public memory."""
     try:
         memory = await services.get_memory(
-            memory_id, repo, service_manager.get_filesys()
+            memory_id, repo, service_manager.get_storage()
         )
     except MemoryNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

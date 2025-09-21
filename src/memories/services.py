@@ -16,7 +16,6 @@ from tags import Tag
 from utils.background_tasks import BackgroundTasks
 from utils.events.pubsub import LocalPublisher
 from utils.file_storage.base_storage import AbstractFileStorage
-from utils.rss_parser import RssItem
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +73,12 @@ async def get_memory(
     """
     memory = await memory_repo.get(memory_id)
     # check file presigned URLs are still valid, and regenerate if not
-    jobs: list[Coroutine[Any, Any, None]] = []
+    jobs: list[Coroutine[Any, Any, Any]] = []
     for fragment in memory.fragments:
         if isinstance(fragment, File):
             jobs.append(fragment.check_presigned_url(memory.id, ifilesys))
+        if isinstance(fragment, RSSFeed):
+            jobs.append(fragment.load_aggregated_feed())
     if jobs:
         await asyncio.gather(*jobs, return_exceptions=True)
         await memory_repo.update(memory)
@@ -201,21 +202,6 @@ async def add_rss_feed_to_memory(
     memory.fragments.append(rssf)
     await memory_repo.update(memory)
     return rssf.id
-
-
-async def get_rss_feed_items(
-    memory_id: UUID,
-    fragment_id: UUID,
-    repo: AbstractMemoryRepository,
-) -> list[RssItem]:
-    """Parse the RSS feed and return the news items, sorted by publication
-    date."""
-    memory = await repo.get(memory_id)
-    fragment = memory.get_fragment(fragment_id)
-    if not isinstance(fragment, RSSFeed):
-        raise TypeError(f"Fragment {fragment_id} is not an RSSFeed Fragment.")
-    items = await fragment.load_aggregated_feed()
-    return items
 
 
 async def modify_rss_feed_fragment(

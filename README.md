@@ -27,3 +27,40 @@ graph TD;
     M --> MP
     F --> FP
 ```
+
+
+## API
+
+- create memory
+- list simple memories
+- get memory
+- delete memory
+- pin memory
+- tag memory
+- set fragment ordering
+- set memory title
+
+- add file fragment
+- add text/rich text fragment
+- add rss fragment
+- modify text fragment
+- modify rss fragment
+- delete fragment
+
+
+- get memory
+- list user/account memories
+- delete memory
+- pin memory
+- tag memory
+- set fragment ordering of memory
+- set memory title
+- add fragment
+- modify fragment
+- delete fragment
+
+
+## other sharing stuff
+
+- pinning a memory should only pin it for that user
+- exporting memories/fragments as markdown? how do we deal with different media?

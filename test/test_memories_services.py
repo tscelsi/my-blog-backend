@@ -129,8 +129,9 @@ async def test_get_rss_feed_channel(
     memory = await repo.get(memory_id)
     fragment = memory.get_fragment(fragment_id)
     assert isinstance(fragment, RSSFeed)
-    feed = await fragment.load_aggregated_feed()
-    assert len(feed) == 10
+    await fragment.load_aggregated_feed()
+    assert fragment.feed is not None
+    assert len(fragment.feed) == 10
 
 
 async def test_create_memory_creates_permissions(

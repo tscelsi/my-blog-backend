@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from entities.fragments.file import File
 from entities.fragments.rss import RSSFeed
 from entities.fragments.text import RichText
-from entities.user import User
 from tags import Tag
 from utils.logging_adapter import CustomLoggingAdapter
 from utils.mixins import AuditMixin
@@ -74,31 +73,6 @@ class Memory(AuditMixin, BaseModel):
         if not isinstance(other, Memory):
             return False
         return self.id == other.id
-
-    def cedar_schema(self) -> dict[str, Any]:
-        """Convert a Memory entity to a Cedar schema entity."""
-        return {
-            "uid": self.cedar_eid_json(),
-            "attrs": {
-                "editors": [
-                    {"__entity": User(id=editor).cedar_eid_json()}
-                    for editor in self.editors
-                ],
-                "readers": [
-                    {"__entity": User(id=reader).cedar_eid_json()}
-                    for reader in self.readers
-                ],
-                "owner": {"__entity": User(id=self.owner).cedar_eid_json()},
-            },
-            "parents": [],
-        }
-
-    def cedar_eid_str(self) -> str:
-        """Convert the Memory entity to a Cedar EID."""
-        return f'{__class__.__name__}::"{self.id}"'
-
-    def cedar_eid_json(self) -> dict[str, str]:
-        return {"id": str(self.id), "type": __class__.__name__}
 
     def get_fragment(self, fragment_id: UUID):
         for fragment in self.fragments:
