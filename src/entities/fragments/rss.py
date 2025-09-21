@@ -72,6 +72,7 @@ class RSSFeed(BaseFragment):
         self.feed = sorted(
             items, key=lambda item: item.pub_date, reverse=True
         )[: self.n_items]
+        self.feed_last_generated = datetime.now(tz=timezone.utc)
 
     async def _load_feed_xml(self, url: str) -> Element:
         """Fetch the RSS feed and return the text."""
