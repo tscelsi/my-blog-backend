@@ -22,6 +22,7 @@ from utils.events.pubsub import LocalPublisher
 from utils.file_storage.base_storage import AbstractFileStorage
 from utils.file_storage.fake_storage import FakeStorage
 from utils.file_storage.supabase_storage import SupabaseStorage
+from utils.ping_supabase import ping_supabase
 
 logger = logging.getLogger(__name__)
 
@@ -128,3 +129,6 @@ class ServiceManager:
         self.permissions_event_handler.subscribe(
             [x for x in PermissionsEvents]
         )
+
+        # supabase ping task #
+        self.background_tasks.add(ping_supabase, self.memory_repository)
